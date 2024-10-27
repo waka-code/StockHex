@@ -31,6 +31,9 @@ README.md
 .vs/
 bin/
 obj/
-StockHex Api/.vs/
 StockHex Api/bin/
 StockHex Api/obj/
+.vs/
+.dockerignore
+bin/
+obj/

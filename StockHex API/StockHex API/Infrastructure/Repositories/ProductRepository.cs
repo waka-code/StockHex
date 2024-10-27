@@ -1,7 +1,7 @@
 ﻿using StockHex_API.Domain.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using StockHex_API.Domain.Entities;
 using StockHex_API.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace StockHex_API.Infrastructure.Repositories
 {
@@ -20,7 +20,7 @@ namespace StockHex_API.Infrastructure.Repositories
             var existingProduct = await _context.Products
                     .FirstOrDefaultAsync(p => p.Name == product.Name);
 
-
+            Console.WriteLine("existingProduct", existingProduct);
             if (existingProduct != null)
             {
                 existingProduct.Stock_quantity += product.Stock_quantity;
