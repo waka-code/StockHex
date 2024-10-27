@@ -17,8 +17,22 @@ namespace StockHex_API.Infrastructure.Repositories
         public async Task<Product> PostProduct(Product product)
         {
             await _context.Products.AddAsync(product);
-            await _context.SaveChangesAsync();
-            return product;
+            var existingProduct = await _context.Products
+                    .FirstOrDefaultAsync(p => p.Name == product.Name);
+
+
+            if (existingProduct != null)
+            {
+                existingProduct.Stock_quantity += product.Stock_quantity;
+                await _context.SaveChangesAsync();
+                return existingProduct;
+            }
+            else
+            {
+                await _context.Products.AddAsync(product);
+                await _context.SaveChangesAsync();
+                return product;
+            }
         }
 
         public async Task<Product> UpdateProductById(Product product)
