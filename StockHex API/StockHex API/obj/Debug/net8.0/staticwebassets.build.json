@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "S1I+ZR5LjneRcV7oSdJBwdbncW5zphdKfHf/UuTU4PA=",
+  "Source": "StockHex API",
+  "BasePath": "_content/StockHex API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
