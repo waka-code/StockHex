@@ -39,7 +39,7 @@ namespace StockHex_API.Domain.Services
             if (productExist == null)
                 throw new KeyNotFoundException($"Product with ID not found: {product.Id}");
             productExist.Name = product.Name;
-            productExist.Descripcion = product.Descripcion;
+            productExist.Description = product.Description;
             productExist.Sku = product.Sku;
             productExist.Price = product.Price;
             productExist.Stock_quantity = product.Stock_quantity;

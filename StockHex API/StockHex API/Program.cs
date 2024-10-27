@@ -20,6 +20,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Registro del repositorio
 builder.Services.AddProductoServices();
+builder.Services.AddCategoryServices();
 
 var app = builder.Build();
 

@@ -1,5 +1,4 @@
 ﻿using StockHex_API.Domain.Entities;
-using StockHex_API.Domain.Interfaces;
 using StockHex_API.Domain.Services;
 
 namespace StockHex_API.Application.UseCases.UseProduct

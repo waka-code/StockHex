@@ -19,7 +19,7 @@ namespace StockHex_API.Application.UseCases.ProductUseCases
                 throw new KeyNotFoundException($"Prodcut not found: {product.Id}");
 
             product_exist.Name = product.Name;
-            product_exist.Descripcion = product.Descripcion;
+            product_exist.Description = product.Description;
             product_exist.Sku = product.Sku;
             product_exist.Price = product.Price;
             product_exist.Stock_quantity = product.Stock_quantity;

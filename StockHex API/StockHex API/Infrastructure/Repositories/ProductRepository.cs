@@ -20,7 +20,6 @@ namespace StockHex_API.Infrastructure.Repositories
             var existingProduct = await _context.Products
                     .FirstOrDefaultAsync(p => p.Name == product.Name);
 
-            Console.WriteLine("existingProduct", existingProduct);
             if (existingProduct != null)
             {
                 existingProduct.Stock_quantity += product.Stock_quantity;

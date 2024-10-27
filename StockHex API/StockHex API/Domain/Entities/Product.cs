@@ -11,7 +11,7 @@ namespace StockHex_API.Domain.Entities
         public required string Name { get; set; }
 
         [MaxLength(100)]
-        public string Descripcion { get; set; }
+        public string Description { get; set; }
 
         [MaxLength(100)]
         public string Sku { get; set; }
@@ -21,8 +21,8 @@ namespace StockHex_API.Domain.Entities
         public decimal Price { get; set; }
 
         public int Stock_quantity { get; set; }
-        public int Category_id { get; set; }
-        public int Supplier_id { get; set; }
+        public string Category_id { get; set; }
+        public string Supplier_id { get; set; }
 
         [MaxLength(50)]
         public string Creation_date { get; set; }
