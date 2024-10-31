@@ -10,12 +10,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configuración de la cadena de conexión y registro de ApplicationDbContext
+// Configuraciï¿½n de la cadena de conexiï¿½n y registro de ApplicationDbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 //var config = builder.Configuration;
 //var defaultConnection = config.GetConnectionString("DefaultConnection");
+
 //Console.WriteLine($"Connection String: {defaultConnection}");
 
 // Registro del repositorio
