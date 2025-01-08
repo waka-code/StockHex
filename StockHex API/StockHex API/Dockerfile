@@ -1,4 +1,4 @@
-#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
@@ -8,15 +8,26 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["StockHex API/StockHex API.csproj", "StockHex API/"]
-RUN dotnet restore "./StockHex API/StockHex API.csproj"
+
+# Copiar el archivo .csproj al contenedor
+COPY ["StockHex API/StockHex API/StockHex API.csproj", "StockHex API/StockHex API/"]
+
+# Restaurar dependencias
+RUN dotnet restore "StockHex API/StockHex API/StockHex API.csproj"
+
+# Copiar el resto del código al contenedor
 COPY . .
-WORKDIR "/src/StockHex API"
-RUN dotnet build "./StockHex API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+# Dar permisos necesarios
+RUN chmod -R 777 /src
+
+# Compilar el proyecto
+WORKDIR "/src/StockHex API/StockHex API"
+RUN dotnet build "StockHex API.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./StockHex API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "StockHex API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

@@ -36,13 +36,15 @@ namespace StockHex_API.Domain.Services
         {
             var clientExist = await _repository.GetClientById(client.Id);
             if (clientExist == null)
+            {
                 throw new KeyNotFoundException($"client with ID not found: {client.Id}");
+            }
+
+
             clientExist.Name = client.Name;
             clientExist.Phone_Number = client.Phone_Number;
             clientExist.Address = client.Address;
             clientExist.Email = client.Email;
-
-
             return await _repository.UpdateClientById(clientExist);
         }
 
@@ -50,7 +52,9 @@ namespace StockHex_API.Domain.Services
         {
             var deleteClient = await _repository.GetClientById(id);
             if (deleteClient == null)
+            {
                 throw new KeyNotFoundException($"client with ID: {id} was not found.");
+            }
             await _repository.DeleteClientById(deleteClient.Id);
         }
     }

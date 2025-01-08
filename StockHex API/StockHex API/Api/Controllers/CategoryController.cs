@@ -30,7 +30,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpGet]
-        [Route("category_by_id")]
+        [Route("${id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var category = await _getCategoryById.RunAsync(id);
@@ -38,7 +38,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpGet]
-        [Route("all_category")]
+        [Route("all")]
         public async Task<IActionResult> GetAll()
         {
             var category = await _getAllCategory.Run();
@@ -46,7 +46,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpPost]
-        [Route("create_new_category")]
+        [Route("new")]
         public async Task<IActionResult> Create([FromBody] Category category)
         {
             await _postCategory.Run(category);
@@ -54,7 +54,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpPut]
-        [Route("update_category")]
+        [Route("update")]
         public async Task<IActionResult> Update(Guid id, [FromBody] Category category)
         {
             category.Id = id;
@@ -63,7 +63,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpDelete]
-        [Route("delete_category")]
+        [Route("delete")]
         public async Task<IActionResult> Delete(Guid id)
         {
             await _deleteCategoryById.Run(id);

@@ -8,7 +8,7 @@ namespace StockHex_API.Domain.Entities
         public Guid Id { get; set; }
 
         [MaxLength(50)]
-        public required string Name { get; set; }
+        public  string Name { get; set; } = string.Empty;
 
         [MaxLength(100)]
         public string Description { get; set; }

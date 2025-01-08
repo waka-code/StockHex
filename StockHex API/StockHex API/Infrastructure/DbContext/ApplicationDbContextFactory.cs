@@ -7,8 +7,15 @@ namespace StockHex_API.Infrastructure.Persistence
     {
         public ApplicationDbContext CreateDbContext(string[] args)
         {
+
+            var configuration = new ConfigurationBuilder()
+             .SetBasePath(Directory.GetCurrentDirectory())
+             .AddJsonFile("appsettings.json")
+             .Build();
+
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            optionsBuilder.UseSqlServer("Server=DESKTOP-HDP6M26\\WADDIMI;Database=StockHex;User Id=sa;Password=123456;TrustServerCertificate=True;");
+            optionsBuilder.UseSqlServer(connectionString);
             return new ApplicationDbContext(optionsBuilder.Options);
         }
     }

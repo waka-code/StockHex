@@ -31,7 +31,7 @@ namespace StockHex_API.Api.Controllers
 
 
         [HttpGet]
-        [Route("product_by_id")]
+        [Route("${id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var product = await _getProductById.RunAsync(id);
@@ -39,7 +39,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpGet]
-        [Route("all_product")]
+        [Route("all")]
         public async Task<IActionResult> GetAll()
         {
             var products = await _getAllProducts.Run();
@@ -47,7 +47,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpPost]
-        [Route("create_new_product")]
+        [Route("new")]
         public async Task<IActionResult> Create([FromBody] Product product)
         {
             await _postProduct.Run(product);
@@ -55,7 +55,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpPut]
-        [Route("update_product")]
+        [Route("update")]
         public async Task<IActionResult> Update(Guid id, [FromBody] Product product)
         {
             product.Id = id;
@@ -64,7 +64,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpDelete]
-        [Route("delete_product")]
+        [Route("delete")]
         public async Task<IActionResult> Delete(Guid id)
         {
             await _deleteProductById.Run(id);
