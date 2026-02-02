@@ -30,7 +30,7 @@ namespace StockHex_API.Api.Controllers
         }
 
         [HttpGet]
-        [Route("${id}")]
+        [Route("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var category = await _getCategoryById.RunAsync(id);

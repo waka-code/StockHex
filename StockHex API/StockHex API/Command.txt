@@ -1,0 +1,38 @@
+# change to the project directory (contains the Dockerfile)
+# path: `/Users/waddini/RiderProjects/StockHex/StockHex API/StockHex API`
+cd "/Users/waddini/RiderProjects/StockHex/StockHex API/StockHex API"
+
+# stop & remove existing container if present
+docker stop stockhex-api 2>/dev/null || true
+docker rm stockhex-api 2>/dev/null || true
+
+# build the image
+docker build -t stockhex-api:latest .
+
+# run the container (maps host 8080 to container 8080)
+docker run -d -p 8080:8080 --name stockhex-api stockhex-api:latest
+
+# view logs
+docker logs -f stockhex-api
+
+# Mas opciones
+
+# Inspect the existing container
+docker ps -a --filter "name=stockhex-api"
+
+# Option A: start the existing container (if stopped)
+docker start stockhex-api
+docker logs -f stockhex-api
+
+# Option B: stop and remove, then run your new one
+docker stop stockhex-api 2>/dev/null || true
+docker rm stockhex-api
+docker run -d -p 8080:8080 --name stockhex-api stockhex-api:latest
+docker logs -f stockhex-api
+
+# Option C: force-remove immediately and recreate
+docker rm -f stockhex-api
+docker run -d -p 8080:8080 --name stockhex-api stockhex-api:latest
+
+# Option D: run with a different name (keeps existing container)
+docker run -d -p 8080:8080 --name stockhex-api2 stockhex-api:latest
