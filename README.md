@@ -629,6 +629,68 @@ Y el resto:
 
 ---
 
+## ¿Encontraste un error? Rómpelo y cuéntamelo
+
+Este proyecto se apoya en 194 tests de API y 418 comprobaciones en navegador, y aun
+así **cada revisión seria ha encontrado algo**: una tabla que se comprimía en vez de
+desplazarse en pantallas estrechas, un reintento de concurrencia que se agotaba con
+25 movimientos en paralelo, un `?categoryId=` corrupto que dejaba el listado con un
+aviso de error. Ninguno lo cazó la suite que ya existía. Si rompes algo, ese hallazgo
+vale.
+
+### Reportarlo
+
+Abre un [issue](https://github.com/waka-code/StockHex/issues/new) con lo necesario
+para **reproducirlo**, no sólo con lo que viste:
+
+- **Qué hiciste**, paso a paso, y con qué rol.
+- **Qué esperabas** y qué ocurrió en su lugar.
+- **La evidencia**: la respuesta completa de la API —el cuerpo `ProblemDetails` trae
+  `code` y, en los errores inesperados, el `traceId` con el que encontrarlo en el
+  log—, la petición que la provocó, una captura si es visual, y el ancho de ventana
+  si es de maquetación.
+- **Dónde**: `docker compose up`, el servidor de Vite, o un despliegue propio.
+
+Un reporte sin forma de reproducirlo se queda en anécdota.
+
+### Mandar el arreglo
+
+Los PR van contra **`main`**. La rama `gh-pages` es sólo el sitio publicado: ahí no
+va código.
+
+```bash
+git checkout -b fix/lo-que-arreglas
+```
+
+El listón es el que ya cumple el resto del proyecto: **un test que falla antes de tu
+cambio y pasa después**. No es burocracia — es lo que separa un arreglo de una
+casualidad, y lo que impide que el mismo error vuelva dentro de seis meses. Según
+dónde esté:
+
+| Si el error está en… | El test va en… |
+|---|---|
+| Una regla de negocio o un caso de uso | `StockHex API.Tests/UseCases/` |
+| El pipeline HTTP: autenticación, permisos, validación | `StockHex API.Tests/Integration/` |
+| Algo que sólo el motor detecta: índices, `rowversion`, colaciones | `StockHex API.Tests/Database/`, contra SQL Server real |
+| La interfaz o el comportamiento en el navegador | `StockHex.Web/e2e/`, reutilizando `harness.mjs` |
+
+Antes de abrirlo, pasa lo mismo que pasa el CI:
+
+```bash
+cd "StockHex API" && dotnet build "StockHex API.sln" -c Release -warnaserror && dotnet test
+cd StockHex.Web && npm run typecheck && npm run lint && npm run build
+```
+
+`-warnaserror` no es negociable: la solución compila con **0 warnings** y tiene que
+seguir así. El CI además audita las dependencias y construye las imágenes del compose,
+así que un PR que rompa cualquiera de esas cosas se pone en rojo solo.
+
+Y lee [`CLAUDE.md`](CLAUDE.md) antes de escribir la primera línea: son las reglas del
+proyecto, e incluyen el estado de cumplimiento declarado —con lo que hoy **no**
+cumple, para que nadie repita una deuda que ya está anotada.
+
+---
+
 ## Licencia
 
 Sin licencia definida. Añade un `LICENSE` antes de publicar.
