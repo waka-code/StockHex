@@ -1,25 +1,25 @@
-﻿using StockHex_API.Domain.Entities;
-using StockHex_API.Domain.Services;
+using StockHex_API.Application.DTOs;
+using StockHex_API.Application.Mappings;
+using StockHex_API.Domain.Common;
+using StockHex_API.Domain.Interfaces;
 
-namespace StockHex_API.Application.UseCases.CategoryUseCases
+namespace StockHex_API.Application.UseCases.CategoryUseCases;
+
+public sealed class GetCategoryById
 {
-    public class GetCategoryById
+    private readonly ICategoryRepository _categories;
+
+    public GetCategoryById(ICategoryRepository categories) => _categories = categories;
+
+    public async Task<Result<CategoryResponse>> RunAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
     {
-        private readonly CategoryService _categoryService;
+        var category = await _categories.GetByIdAsync(id, cancellationToken);
+        if (category is null)
+            return Result<CategoryResponse>.Failure(Error.NotFound("Categoría", id));
 
-        public GetCategoryById(CategoryService categoryService)
-        {
-            _categoryService = categoryService;
-        }
-
-        public async Task<Category> RunAsync(Guid id)
-        {
-            var category = await _categoryService.GetCategoryById(id);
-
-            if (category == null)
-                throw new KeyNotFoundException($"Category with ID not found: {id}");
-
-            return category;
-        }
+        var productCount = await _categories.CountProductsAsync(id, cancellationToken);
+        return category.ToResponse(productCount);
     }
 }

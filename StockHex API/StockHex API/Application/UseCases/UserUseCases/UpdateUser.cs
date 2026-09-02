@@ -1,37 +1,54 @@
-﻿using StockHex_API.Domain.Entities;
-using StockHex_API.Domain.Services;
+using StockHex_API.Application.DTOs;
+using StockHex_API.Application.Mappings;
+using StockHex_API.Domain.Common;
+using StockHex_API.Domain.Enums;
+using StockHex_API.Domain.Interfaces;
 
-namespace StockHex_API.Application.UseCases.UserUseCases
+namespace StockHex_API.Application.UseCases.UserUseCases;
+
+public sealed class UpdateUser
 {
-    public class UpdateUser
+    private readonly IUserRepository _users;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public UpdateUser(IUserRepository users, IUnitOfWork unitOfWork)
     {
-        private readonly UserService _userService;
+        _users = users;
+        _unitOfWork = unitOfWork;
+    }
 
-        public UpdateUser(UserService userService)
-        {
-            _userService = userService;
-        }
+    public async Task<Result<UserResponse>> RunAsync(
+        Guid id,
+        UpdateUserRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _users.GetByIdAsync(id, cancellationToken);
+        if (user is null)
+            return Result<UserResponse>.Failure(Error.NotFound("Usuario", id));
 
-        public async Task Run(User user)
-        {
-            var user_exist = await _userService.GetUserById(user.Id);
+        var email = request.Email.Trim().ToLowerInvariant();
 
-            if (user_exist == null)
-            {
-                throw new KeyNotFoundException($"User not found: {user.Id}");
-            }
+        if (await _users.ExistsByEmailAsync(email, id, cancellationToken))
+            return Result<UserResponse>.Failure(
+                Error.Conflict($"Ya existe otro usuario con el email '{email}'."));
 
-            user_exist.Creation_date = user.Creation_date;
-            user_exist.Name = user.Name;
-            user_exist.Email = user.Email;
-            user_exist.Password = user.Password;
-            user_exist.Password_Confirmed = user.Password_Confirmed;
-            user_exist.Role = user.Role;
-            user_exist.Email_Confirmed = user.Email_Confirmed;
+        // Sin este guardia se puede dejar el sistema sin ningún administrador activo.
+        var losesAdmin = user.Role == UserRole.Admin &&
+                         (request.Role != UserRole.Admin || !request.IsActive);
 
-            await _userService.UpdateUserById(user_exist);
+        if (losesAdmin && await _users.CountByRoleAsync(UserRole.Admin, cancellationToken) <= 1)
+            return Result<UserResponse>.Failure(Error.Conflict(
+                "No se puede degradar ni desactivar al único administrador del sistema."));
 
+        user.Name = request.Name.Trim();
+        user.Email = email;
+        user.Role = request.Role;
+        user.IsActive = request.IsActive;
+        user.UpdatedAt = DateTime.UtcNow;
 
-        }
+        _users.Update(user);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return user.ToResponse();
     }
 }

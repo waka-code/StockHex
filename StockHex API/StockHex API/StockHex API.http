@@ -1,6 +1,284 @@
-@StockHex_API_HostAddress = http://localhost:5163
+### Variables ###############################################################
+@host = http://localhost:8080
+@adminEmail = admin@stockhex.local
+@adminPassword = Admin123456
 
-GET {{StockHex_API_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Login — guarda el token para las peticiones siguientes ###############
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
 
 ###
+@token = {{login.response.body.accessToken}}
+@refreshToken = {{login.response.body.refreshToken}}
+
+### 2. Perfil del token #####################################################
+GET {{host}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### 3. Crear categoría ######################################################
+# @name createCategory
+POST {{host}}/api/categories
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Bebidas",
+  "description": "Productos líquidos"
+}
+
+###
+@categoryId = {{createCategory.response.body.id}}
+
+### 4. Listar categorías (paginado) #########################################
+GET {{host}}/api/categories?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### 5. Crear proveedor ######################################################
+# @name createSupplier
+POST {{host}}/api/suppliers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Distribuidora Central",
+  "phoneNumber": "+56 9 1234 5678",
+  "email": "ventas@distribuidora.cl"
+}
+
+###
+@supplierId = {{createSupplier.response.body.id}}
+
+### 6. Crear producto — nace con stock 0 ####################################
+# @name createProduct
+POST {{host}}/api/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Agua mineral 500ml",
+  "description": "Botella individual",
+  "sku": "AGUA-500",
+  "price": 990.50,
+  "minimumStock": 20,
+  "categoryId": "{{categoryId}}",
+  "supplierId": "{{supplierId}}"
+}
+
+###
+@productId = {{createProduct.response.body.id}}
+
+### 7. ENTRADA de 100 unidades ##############################################
+POST {{host}}/api/inventory-movements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "movementType": "In",
+  "quantity": 100,
+  "unitPrice": 500,
+  "supplierId": "{{supplierId}}",
+  "comment": "Compra inicial OC-1042"
+}
+
+### 8. Crear cliente ########################################################
+# @name createClient
+POST {{host}}/api/clients
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Almacén Don Pedro",
+  "address": "Av. Siempre Viva 742",
+  "phoneNumber": "+56 2 2345 6789",
+  "email": "donpedro@cliente.cl"
+}
+
+###
+@clientId = {{createClient.response.body.id}}
+
+### 9. SALIDA de 30 unidades a un cliente ###################################
+POST {{host}}/api/inventory-movements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "movementType": "Out",
+  "quantity": 30,
+  "clientId": "{{clientId}}",
+  "comment": "Venta"
+}
+
+### 10. SALIDA imposible — debe responder 409 ###############################
+POST {{host}}/api/inventory-movements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "movementType": "Out",
+  "quantity": 999999
+}
+
+### 11. AJUSTE por conteo físico — fija el stock en 55 ######################
+POST {{host}}/api/inventory-movements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "movementType": "Adjustment",
+  "quantity": 55,
+  "comment": "Conteo físico de bodega"
+}
+
+### 12. Stock actual del producto ###########################################
+GET {{host}}/api/products/{{productId}}
+Authorization: Bearer {{token}}
+
+### 13. Historial del producto ##############################################
+GET {{host}}/api/inventory-movements?productId={{productId}}&page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### 14. Productos en stock bajo #############################################
+GET {{host}}/api/products?lowStockOnly=true
+Authorization: Bearer {{token}}
+
+### 15. Reporte: resumen de inventario ######################################
+GET {{host}}/api/reports/inventory-summary
+Authorization: Bearer {{token}}
+
+### 16. Reporte: stock bajo #################################################
+GET {{host}}/api/reports/low-stock
+Authorization: Bearer {{token}}
+
+### 17. Reporte: movimientos del período ####################################
+GET {{host}}/api/reports/movement-summary
+Authorization: Bearer {{token}}
+
+### 18. Crear un operador (sólo Admin) ######################################
+POST {{host}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Juan Operario",
+  "email": "juan@stockhex.local",
+  "password": "Operario123",
+  "confirmPassword": "Operario123",
+  "role": "Operator"
+}
+
+### 19. Login como operador #################################################
+# @name loginOperator
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "juan@stockhex.local",
+  "password": "Operario123"
+}
+
+###
+@operatorToken = {{loginOperator.response.body.accessToken}}
+
+### 20. Operador intentando crear categoría — debe dar 403 ##################
+POST {{host}}/api/categories
+Authorization: Bearer {{operatorToken}}
+Content-Type: application/json
+
+{
+  "name": "Prohibida"
+}
+
+### 21. Cambiar mi contraseña ###############################################
+POST {{host}}/api/users/me/change-password
+Authorization: Bearer {{operatorToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "Operario123",
+  "newPassword": "Operario456",
+  "confirmPassword": "Operario456"
+}
+
+### 22. Sin token — debe dar 401 ############################################
+GET {{host}}/api/products
+
+### 23. Validación — debe dar 400 con detalle por campo #####################
+POST {{host}}/api/categories
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": ""
+}
+
+### 24. Salud ###############################################################
+GET {{host}}/health/live
+
+###
+GET {{host}}/health/ready
+
+### 25. Renovar el access token (rota el refresh) ##########################
+# @name refreshed
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+@rotatedToken = {{refreshed.response.body.refreshToken}}
+
+### 26. Reutilizar el refresh viejo — 401 y corta la sesión #################
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### 27. Historial filtrado por proveedor ####################################
+GET {{host}}/api/inventory-movements?supplierId={{supplierId}}
+Authorization: Bearer {{token}}
+
+### 28. Revertir un movimiento ##############################################
+# Toma el id de un movimiento del paso 13. No edita ni borra el original:
+# registra el movimiento inverso, y sólo se puede hacer una vez.
+@movementId = 00000000-0000-0000-0000-000000000000
+
+POST {{host}}/api/inventory-movements/{{movementId}}/reverse
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "comment": "Orden de compra anulada"
+}
+
+### 29. Rate limiting — repite este bloque 11 veces para ver el 429 #########
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "contrasena-incorrecta"
+}
+
+### 30. Cerrar sesión (revoca el refresh token) #############################
+POST {{host}}/api/auth/logout
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "refreshToken": "{{rotatedToken}}",
+  "allSessions": false
+}

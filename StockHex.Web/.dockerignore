@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.local
+e2e/shots
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+*.log

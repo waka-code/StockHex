@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="es-CL">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="StockHex · gestión de inventario con auditoría de movimientos" />
+    <title>StockHex</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Lo genera el contenedor al arrancar; en desarrollo no existe y se usa
+         VITE_API_URL. El 404 en la consola de `npm run dev` es esperado. -->
+    <script src="/config.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

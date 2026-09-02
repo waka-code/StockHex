@@ -1,0 +1,35 @@
+{
+  "name": "stockhex-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "oxlint src",
+    "e2e": "node e2e/smoke.mjs && node e2e/roles.mjs && node e2e/refresh.mjs",
+    "e2e:smoke": "node e2e/smoke.mjs",
+    "e2e:roles": "node e2e/roles.mjs",
+    "e2e:refresh": "node e2e/refresh.mjs",
+    "e2e:proxy": "node e2e/proxy.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "playwright": "^1.56.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  },
+  "description": "Interfaz web de StockHex"
+}

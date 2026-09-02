@@ -1,25 +1,24 @@
-﻿using StockHex_API.Domain.Entities;
-using StockHex_API.Domain.Services;
+using StockHex_API.Application.DTOs;
+using StockHex_API.Application.Mappings;
+using StockHex_API.Domain.Common;
+using StockHex_API.Domain.Interfaces;
 
-namespace StockHex_API.Application.UseCases.UseProduct
+namespace StockHex_API.Application.UseCases.ProductUseCases;
+
+public sealed class GetProductById
 {
-    public class GetProductById
+    private readonly IProductRepository _products;
+
+    public GetProductById(IProductRepository products) => _products = products;
+
+    public async Task<Result<ProductResponse>> RunAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
     {
-        private readonly ProductService _productService;
+        var product = await _products.GetByIdAsync(id, includeRelations: true, cancellationToken);
 
-        public GetProductById(ProductService productService)
-        {
-            _productService = productService;
-        }
-
-        public async Task<Product> RunAsync(Guid id)
-        {
-            var product = await _productService.GetProductById(id);
-
-            if (product == null)
-                throw new KeyNotFoundException($"Product with ID not found: {id}");
-
-            return product;
-        }
+        return product is null
+            ? Result<ProductResponse>.Failure(Error.NotFound("Producto", id))
+            : product.ToResponse();
     }
 }

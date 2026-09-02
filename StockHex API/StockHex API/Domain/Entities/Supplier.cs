@@ -1,12 +1,22 @@
-﻿namespace StockHex_API.Domain.Entities
+namespace StockHex_API.Domain.Entities;
+
+public class Supplier
 {
-    public class Supplier
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string Phone_Number { get; set; }
-        public string Email { get; set; }
-        public string[] Products { get; set; }
-    }
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public string Name { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public string? PhoneNumber { get; set; }
+
+    public string? Email { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public ICollection<Product> Products { get; set; } = new List<Product>();
+
+    public ICollection<InventoryMovement> Movements { get; set; } = new List<InventoryMovement>();
 }

@@ -1,14 +1,31 @@
-﻿namespace StockHex_API.Domain.Entities
+using StockHex_API.Domain.Enums;
+
+namespace StockHex_API.Domain.Entities;
+
+public class User
 {
-    public class User
-    {
-        public Guid Id { get; set; }
-        public  string Name { get; set; } = string.Empty;
-        public   string Email { get; set; } = string.Empty;
-        public  string Password { get; set; } = string.Empty;
-        public  string Email_Confirmed { get; set; } = string.Empty;
-        public  string Password_Confirmed { get; set; } = string.Empty;
-        public  string Role { get; set; } = string.Empty;
-        public  string Creation_date { get; set;} = string.Empty;
-    }
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>Hash BCrypt. Nunca se expone en un DTO de respuesta.</summary>
+    public string PasswordHash { get; set; } = string.Empty;
+
+    public UserRole Role { get; set; } = UserRole.Operator;
+
+    public bool IsActive { get; set; } = true;
+
+    public bool EmailConfirmed { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public DateTime? LastLoginAt { get; set; }
+
+    public ICollection<InventoryMovement> Movements { get; set; } = new List<InventoryMovement>();
+
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

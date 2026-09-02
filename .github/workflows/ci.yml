@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restaurar dependencias
+        run: dotnet restore "StockHex API/StockHex API.sln"
+
+      - name: Compilar
+        # Los warnings se tratan como error para que la solución no se degrade:
+        # hoy compila con cero warnings.
+        run: >
+          dotnet build "StockHex API/StockHex API.sln"
+          --configuration Release
+          --no-restore
+          -warnaserror
+
+      - name: Ejecutar tests con cobertura
+        run: >
+          dotnet test "StockHex API/StockHex API.sln"
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Publicar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults
+          retention-days: 7
+
+  web:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: StockHex.Web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: StockHex.Web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar tipos
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compilar
+        run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir las imágenes de la API y del frontend
+        # Se construyen desde el compose para verificar que los contextos y las
+        # rutas del archivo real siguen siendo correctos, no sólo los Dockerfile.
+        env:
+          MSSQL_SA_PASSWORD: ci-placeholder
+          JWT_KEY: clave-de-integracion-continua-suficientemente-larga
+          SEED_ADMIN_PASSWORD: ci-placeholder
+        run: docker compose build

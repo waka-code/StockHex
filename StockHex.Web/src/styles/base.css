@@ -1,0 +1,100 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import './tokens.css';
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: var(--acc); text-decoration: none; }
+a:hover { color: var(--ink); text-decoration: underline; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* Numerales tabulares: SKU, cantidades y dinero tienen que alinear en columna,
+   que es lo que se lee todo el día en una tabla de inventario. */
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+/* Sólo para lectores de pantalla. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--bord2);
+  border: 3px solid var(--page);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink3); }
+
+@keyframes shx-spin { to { transform: rotate(360deg); } }
+@keyframes shx-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shx-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ─────────────────────────────────────────── cascarón responsive */
+
+.shx-sidebar { height: 100vh; position: sticky; top: 0; }
+
+.shx-scrim { display: none; }
+
+@media (max-width: 900px) {
+  /* Bajo 900px la barra lateral se convierte en un panel deslizante: en un
+     tablet o teléfono los 232px fijos se comen media pantalla. */
+  .shx-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform .18s ease-out;
+  }
+  .shx-sidebar[data-open] { transform: none; }
+
+  .shx-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: var(--scrim);
+  }
+
+  .shx-menu-button { display: flex !important; }
+}

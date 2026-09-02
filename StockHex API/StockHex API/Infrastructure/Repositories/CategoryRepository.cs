@@ -1,63 +1,66 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using StockHex_API.Domain.Common;
 using StockHex_API.Domain.Entities;
 using StockHex_API.Domain.Interfaces;
 using StockHex_API.Infrastructure.Persistence;
 
-namespace StockHex_API.Infrastructure.Repositories
+namespace StockHex_API.Infrastructure.Repositories;
+
+public sealed class CategoryRepository : ICategoryRepository
 {
-    public class CategoryRepository: ICategoryRepository
+    private readonly ApplicationDbContext _context;
+
+    public CategoryRepository(ApplicationDbContext context) => _context = context;
+
+    public Task<Category?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _context.Categories.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+
+    public async Task<PagedResult<Category>> GetPagedAsync(
+        PageRequest request,
+        CancellationToken cancellationToken = default)
     {
-        private readonly ApplicationDbContext _context;
+        var query = _context.Categories.AsNoTracking();
 
-        public CategoryRepository(ApplicationDbContext context)
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            _context = context;
+            var term = request.Search.Trim();
+            query = query.Where(c => c.Name.Contains(term) ||
+                                     (c.Description != null && c.Description.Contains(term)));
         }
 
-        public async Task<Category> PostCategory(Category category)
-        {
-            await _context.Categories.AddAsync(category);
-            var existingCategory = await _context.Categories
-                    .FirstOrDefaultAsync(p => p.Name == category.Name);
+        var total = await query.CountAsync(cancellationToken);
 
-            if (existingCategory != null)
-            {
-                 throw new Exception("Category Exist");
-            }
-            else
-            {
-                await _context.Categories.AddAsync(category);
-                await _context.SaveChangesAsync();
-                return category;
-            }
-        }
+        var items = await query
+            .Include(c => c.Products)
+            .OrderBy(c => c.Name)
+            .Skip(request.Skip)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
 
-        public async Task<Category> UpdateCategoryById(Category category)
-        {
-            _context.Categories.Update(category);
-            await _context.SaveChangesAsync();
-            return category;
-        }
-
-        public async Task DeleteCategoryById(Guid id)
-        {
-            var category = await _context.Categories.FindAsync(id);
-            if (category != null)
-            {
-                _context.Categories.Remove(category);
-                await _context.SaveChangesAsync();
-            }
-        }
-
-        public async Task<Category> GetCategoryById(Guid id)
-        {
-            return await _context.Categories.FindAsync(id);
-        }
-
-        public async Task<IEnumerable<Category>> GetAllCategory()
-        {
-            return await _context.Categories.ToListAsync();
-        }
-
+        return new PagedResult<Category>(items, total, request.Page, request.PageSize);
     }
+
+    public async Task<IReadOnlyList<Category>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        await _context.Categories
+            .AsNoTracking()
+            .OrderBy(c => c.Name)
+            .ToListAsync(cancellationToken);
+
+    public Task<bool> ExistsByNameAsync(
+        string name,
+        Guid? excludeId = null,
+        CancellationToken cancellationToken = default) =>
+        _context.Categories.AnyAsync(
+            c => c.Name == name && (excludeId == null || c.Id != excludeId),
+            cancellationToken);
+
+    public Task<int> CountProductsAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        _context.Products.CountAsync(p => p.CategoryId == categoryId, cancellationToken);
+
+    public async Task AddAsync(Category category, CancellationToken cancellationToken = default) =>
+        await _context.Categories.AddAsync(category, cancellationToken);
+
+    public void Update(Category category) => _context.Categories.Update(category);
+
+    public void Remove(Category category) => _context.Categories.Remove(category);
 }

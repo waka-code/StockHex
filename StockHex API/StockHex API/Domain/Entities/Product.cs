@@ -1,34 +1,43 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+namespace StockHex_API.Domain.Entities;
 
-namespace StockHex_API.Domain.Entities
+public class Product
 {
-    public class Product
-    {
-        public Guid Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
-        [MaxLength(50)]
-        public  string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 
-        [MaxLength(100)]
-        public string Description { get; set; }
+    public string? Description { get; set; }
 
-        [MaxLength(100)]
-        public string Sku { get; set; }
+    /// <summary>Código único de inventario.</summary>
+    public string Sku { get; set; } = string.Empty;
 
-        [Column(TypeName = "decimal(18,2)")]
-        [DisplayFormat(DataFormatString = "{0:C2}")]
-        public decimal Price { get; set; }
+    public decimal Price { get; set; }
 
-        public int Stock_quantity { get; set; }
-        public string Category_id { get; set; }
-        public string Supplier_id { get; set; }
+    /// <summary>Sólo lo modifican los movimientos de inventario, nunca un update directo del producto.</summary>
+    public int StockQuantity { get; set; }
 
-        [MaxLength(50)]
-        public string Creation_date { get; set; }
+    /// <summary>Umbral para el reporte de stock bajo.</summary>
+    public int MinimumStock { get; set; }
 
-        [MaxLength(50)]
-        public string Update_date { get; set; }
+    public bool IsActive { get; set; } = true;
 
-    }
+    public Guid CategoryId { get; set; }
+
+    public Category? Category { get; set; }
+
+    public Guid? SupplierId { get; set; }
+
+    public Supplier? Supplier { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>Token de concurrencia: evita que dos movimientos simultáneos pisen el mismo stock.</summary>
+    public byte[]? RowVersion { get; set; }
+
+    public ICollection<InventoryMovement> Movements { get; set; } = new List<InventoryMovement>();
+
+    /// <summary>True cuando el stock cayó al umbral configurado o por debajo.</summary>
+    public bool IsLowStock => StockQuantity <= MinimumStock;
 }

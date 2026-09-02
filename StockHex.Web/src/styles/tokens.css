@@ -1,0 +1,160 @@
+/* Tokens del diseño aprobado.
+   El tema oscuro sólo redefine variables: ningún componente conoce colores
+   literales, así que cambiar de tema no toca una sola línea de TSX. */
+
+:root {
+  color-scheme: light;
+
+  --page: #f5f7f8;
+  --surf: #ffffff;
+  --surf2: #fafbfc;
+  --surf3: #f0f3f5;
+  --bord: #e2e7ea;
+  --bord2: #ccd5da;
+
+  --ink: #0f1519;
+  --ink2: #57646c;
+  --ink3: #8a959c;
+
+  --acc: #0d6e66;
+  --acc-soft: #e3f1ef;
+  --acc-ink: #ffffff;
+  --acc-ring: rgba(13, 110, 102, 0.2);
+
+  --nav-bg: #101a1f;
+  --nav-ink: #c5d0d6;
+  --nav-ink2: #78878f;
+  --nav-act: #1d2c33;
+  --nav-bord: #1e2a30;
+
+  --in: #15703f;
+  --in-bg: #e7f3ec;
+  --in-bord: #bfe0cb;
+  --out: #9a5a06;
+  --out-bg: #fbf1e1;
+  --out-bord: #eeddbc;
+  --adj: #53449f;
+  --adj-bg: #ecebf9;
+  --adj-bord: #d3d0f0;
+
+  --dang: #a81f18;
+  --dang-bg: #fceceb;
+  --dang-bord: #f2ceca;
+  --dang-ring: rgba(168, 31, 24, 0.13);
+  --warn: #7d5200;
+  --warn-bg: #fcf3de;
+  --warn-bord: #eedfb6;
+
+  --shadow: 0 1px 2px rgba(15, 21, 25, .05), 0 1px 3px rgba(15, 21, 25, .04);
+  --shadow-lg: 0 16px 44px rgba(9, 14, 17, .18);
+  --scrim: rgba(9, 14, 17, .52);
+
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --r-sm: 4px;
+  --r: 6px;
+  --r-lg: 8px;
+  --r-xl: 11px;
+}
+
+/* El tema oscuro se define dos veces a propósito: bajo prefers-color-scheme
+   para quien no eligió, y bajo [data-theme='dark'] para que el interruptor gane
+   en ambos sentidos sobre la preferencia del sistema. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --page: #0b0f12;
+    --surf: #131a1e;
+    --surf2: #171f24;
+    --surf3: #1c252b;
+    --bord: #212b32;
+    --bord2: #32404a;
+
+    --ink: #e7edf0;
+    --ink2: #94a3ab;
+    --ink3: #68767e;
+
+    --acc: #3fbfae;
+    --acc-soft: #0f2b28;
+    --acc-ink: #04211e;
+    --acc-ring: rgba(63, 191, 174, 0.22);
+
+    --nav-bg: #070b0d;
+    --nav-ink: #b6c3ca;
+    --nav-ink2: #67767e;
+    --nav-act: #141e24;
+    --nav-bord: #151d22;
+
+    --in: #45b97e;
+    --in-bg: #102319;
+    --in-bord: #1d3d2b;
+    --out: #dc9d52;
+    --out-bg: #25190c;
+    --out-bord: #40301a;
+    --adj: #9e93f2;
+    --adj-bg: #1a172f;
+    --adj-bord: #2b2750;
+
+    --dang: #f0857c;
+    --dang-bg: #2a1211;
+    --dang-bord: #48211f;
+    --dang-ring: rgba(240, 133, 124, 0.16);
+    --warn: #dcb45c;
+    --warn-bg: #241c0a;
+    --warn-bord: #3d3117;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 2px 8px rgba(0, 0, 0, .3);
+    --shadow-lg: 0 16px 44px rgba(0, 0, 0, .5);
+    --scrim: rgba(0, 0, 0, .66);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --page: #0b0f12;
+  --surf: #131a1e;
+  --surf2: #171f24;
+  --surf3: #1c252b;
+  --bord: #212b32;
+  --bord2: #32404a;
+
+  --ink: #e7edf0;
+  --ink2: #94a3ab;
+  --ink3: #68767e;
+
+  --acc: #3fbfae;
+  --acc-soft: #0f2b28;
+  --acc-ink: #04211e;
+  --acc-ring: rgba(63, 191, 174, 0.22);
+
+  --nav-bg: #070b0d;
+  --nav-ink: #b6c3ca;
+  --nav-ink2: #67767e;
+  --nav-act: #141e24;
+  --nav-bord: #151d22;
+
+  --in: #45b97e;
+  --in-bg: #102319;
+  --in-bord: #1d3d2b;
+  --out: #dc9d52;
+  --out-bg: #25190c;
+  --out-bord: #40301a;
+  --adj: #9e93f2;
+  --adj-bg: #1a172f;
+  --adj-bord: #2b2750;
+
+  --dang: #f0857c;
+  --dang-bg: #2a1211;
+  --dang-bord: #48211f;
+  --dang-ring: rgba(240, 133, 124, 0.16);
+  --warn: #dcb45c;
+  --warn-bg: #241c0a;
+  --warn-bord: #3d3117;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 2px 8px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 16px 44px rgba(0, 0, 0, .5);
+  --scrim: rgba(0, 0, 0, .66);
+}

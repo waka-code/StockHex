@@ -1,0 +1,114 @@
+# Todo StockHex con un solo comando:
+#
+#   cp .env.example .env    # y edita los valores
+#   docker compose up -d --build
+#
+# Queda la aplicación en http://localhost:8080 — nginx sirve el frontend y hace
+# de proxy de /api hacia la API, así que el navegador nunca cruza de origen y no
+# hay CORS que configurar.
+
+name: stockhex
+
+services:
+  # ────────────────────────────────────────────────────── base de datos
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: stockhex-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?define MSSQL_SA_PASSWORD en .env}
+      MSSQL_PID: Developer
+    healthcheck:
+      # sqlcmd es la comprobación fiable: confirma que el motor acepta consultas,
+      # no sólo que escribió una línea en el log.
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks: [stockhex]
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────── API
+  api:
+    build:
+      context: ./StockHex API/StockHex API
+      dockerfile: Dockerfile
+    image: stockhex-api:latest
+    container_name: stockhex-api
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=StockHex;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False;"
+      Jwt__Key: ${JWT_KEY:?define JWT_KEY en .env (mínimo 32 caracteres)}
+      Jwt__Issuer: StockHexAPI
+      Jwt__Audience: StockHexClient
+      Seed__AdminName: ${SEED_ADMIN_NAME:-Administrador}
+      Seed__AdminEmail: ${SEED_ADMIN_EMAIL:-admin@stockhex.local}
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:?define SEED_ADMIN_PASSWORD en .env}
+      # Swagger expuesto para poder probar el MVP; ponlo en "false" en producción.
+      Swagger__Enabled: ${SWAGGER_ENABLED:-true}
+      # El frontend llega por el proxy de nginx, en el mismo origen, así que no
+      # hace falta ningún origen CORS. Se deja configurable por si algún cliente
+      # externo tiene que consumir la API directamente.
+      Cors__AllowedOrigins: ${CORS_ALLOWED_ORIGINS:-}
+      # nginx reenvía la IP real del cliente; sin esto el límite de intentos de
+      # /api/auth metería a todos los usuarios en el cupo del proxy.
+      #
+      # Sólo se confía en las redes privadas de Docker, y ASP.NET procesa una
+      # sola entrada de X-Forwarded-For (ForwardLimit=1 por omisión). Eso es
+      # justo lo que hace que la cabecera no sea falsificable: nginx añade el
+      # peer real al final con $$proxy_add_x_forwarded_for y la API toma ése,
+      # descartando lo que el cliente haya puesto delante. Comprobado.
+      ForwardedHeaders__Enabled: "true"
+      ForwardedHeaders__KnownNetworks__0: "172.16.0.0/12"
+      ForwardedHeaders__KnownNetworks__1: "10.0.0.0/8"
+      ForwardedHeaders__KnownNetworks__2: "192.168.0.0/16"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [stockhex]
+    restart: on-failure
+    # Sin puertos publicados: sólo nginx habla con la API. Descomenta para
+    # llegarle directo desde la máquina, por ejemplo con curl o Swagger.
+    # ports:
+    #   - "5080:8080"
+
+  # ────────────────────────────────────────────── frontend + proxy
+  web:
+    build:
+      context: ./StockHex.Web
+      dockerfile: Dockerfile
+    image: stockhex-web:latest
+    container_name: stockhex-web
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Las consume la plantilla de nginx al arrancar.
+      API_HOST: api
+      API_PORT: "8080"
+      # Vacío = el navegador usa el mismo origen y pasa por el proxy.
+      API_URL: ${WEB_API_URL:-}
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    networks: [stockhex]
+    restart: unless-stopped
+
+volumes:
+  mssql-data:
+
+networks:
+  stockhex:
+    driver: bridge
