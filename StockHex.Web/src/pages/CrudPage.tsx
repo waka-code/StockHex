@@ -2,14 +2,17 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/problem';
 import type { PagedResponse } from '../api/types';
-import { useCurrentUser } from '../auth/useAuth';
-import { can } from '../auth/roles';
+import { useAuth } from '../auth/useAuth';
+import type { CrudPermissions } from '../auth/permissions';
 import { DataTable, Pager, type Column } from '../components/DataTable';
 import { FilterBar, SearchInput } from '../components/Field';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { useToast } from '../components/useToast';
 import { Button, Card, EmptyState } from '../components/ui';
-import { useDebounced, usePageMeta, useResetPageOnFilterChange } from '../lib/hooks';
+import { usePageMeta } from '../lib/hooks';
+import {
+  numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
+} from '../lib/urlFilters';
 
 /**
  * Categorías, Proveedores y Clientes son el mismo patrón: tabla paginada con
@@ -19,6 +22,11 @@ import { useDebounced, usePageMeta, useResetPageOnFilterChange } from '../lib/ho
 export interface CrudConfig<TItem, TForm> {
   /** Plural, para el título: "Clientes". */
   title: string;
+  /**
+   * Permisos del módulo. Los declara cada pantalla porque este componente es
+   * genérico y no puede deducir a qué módulo sirve.
+   */
+  permissions: CrudPermissions;
   /** Singular en minúscula, para los mensajes: "cliente". */
   singular: string;
   /** Género gramatical, para concordar los mensajes en español. */
@@ -32,7 +40,10 @@ export interface CrudConfig<TItem, TForm> {
   columns: (helpers: {
     edit: (item: TItem) => void;
     remove: (item: TItem) => void;
+    /** True si puede editar o eliminar: sirve para decidir si la columna aparece. */
     writable: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
   }) => Column<TItem>[];
   rowKey: (item: TItem) => string;
   itemLabel: (item: TItem) => string;
@@ -54,21 +65,30 @@ export interface CrudConfig<TItem, TForm> {
 const FORM_ID = 'crud-form';
 
 export function CrudPage<TItem, TForm>(config: CrudConfig<TItem, TForm>) {
-  const user = useCurrentUser();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const writable = can.manageCatalog(user.role);
+  const { can } = useAuth();
 
-  const [page, setPage] = useState(1);
-  const [searchInput, setSearchInput] = useState('');
-  const search = useDebounced(searchInput);
+  const canCreate = can(config.permissions.create);
+  const canEdit = can(config.permissions.edit);
+  const canDelete = can(config.permissions.delete);
+  const writable = canEdit || canDelete;
+
+  const filters = useUrlFilters({
+    page: numberParam(1, { min: 1, pagination: true }),
+    pageSize: pageSizeParam(),
+    search: stringParam(),
+  });
+  const { page, pageSize, search } = filters.values;
+
+  const [searchInput, setSearchInput] = useDebouncedParam(
+    search, (value) => filters.set('search', value));
+
   const [editing, setEditing] = useState<TItem | null>(null);
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<TItem | null>(null);
 
-  useResetPageOnFilterChange(search, page, setPage);
-
-  const query = { page, pageSize: 20, search: search || undefined };
+  const query = { page, pageSize, search: search || undefined };
   const list = useQuery({
     queryKey: [config.queryKey, query],
     queryFn: () => config.list(query),
@@ -99,15 +119,17 @@ export function CrudPage<TItem, TForm>(config: CrudConfig<TItem, TForm>) {
     subtitle: list.data
       ? `${list.data.totalCount} ${list.data.totalCount === 1 ? config.singular : config.title.toLowerCase()}`
       : undefined,
-    actions: writable ? (
+    actions: canCreate ? (
       <Button kind="primary" icon="plus" onClick={() => setCreating(true)}>
         {config.gender === 'f' ? 'Nueva' : 'Nuevo'} {config.singular}
       </Button>
     ) : undefined,
-  }, [list.data?.totalCount, writable]);
+  }, [list.data?.totalCount, canCreate]);
 
   const columns = config.columns({
     writable,
+    canEdit,
+    canDelete,
     edit: setEditing,
     remove: setRemoving,
   });
@@ -142,8 +164,8 @@ export function CrudPage<TItem, TForm>(config: CrudConfig<TItem, TForm>) {
                 ? 'Prueba con otro término.'
                 : `Crea ${config.gender === 'f' ? 'la primera' : 'el primero'} para empezar.`}
               action={search ? (
-                <Button icon="x" size="sm" onClick={() => setSearchInput('')}>Limpiar búsqueda</Button>
-              ) : writable ? (
+                <Button icon="x" size="sm" onClick={filters.reset}>Limpiar búsqueda</Button>
+              ) : canCreate ? (
                 <Button kind="primary" icon="plus" size="sm" onClick={() => setCreating(true)}>
                   {config.gender === 'f' ? 'Nueva' : 'Nuevo'} {config.singular}
                 </Button>
@@ -152,7 +174,14 @@ export function CrudPage<TItem, TForm>(config: CrudConfig<TItem, TForm>) {
           )}
         />
 
-        {list.data ? <Pager data={list.data} onPage={setPage} /> : null}
+        {list.data ? (
+          <Pager
+            data={list.data}
+            onPage={(p) => filters.set('page', p)}
+            pageSize={pageSize}
+            onPageSize={(size) => filters.set('pageSize', size)}
+          />
+        ) : null}
       </Card>
 
       {creating || editing ? (

@@ -5,8 +5,21 @@ namespace StockHex_API.Domain.Common;
 /// <summary>Parámetros de paginación y búsqueda comunes a todos los listados.</summary>
 public class PageRequest
 {
+    /// <summary>
+    /// Los tamaños de página que la interfaz ofrece. Esta es la definición única:
+    /// el selector del frontend la refleja en <c>api/types.ts</c>, igual que los DTOs.
+    /// Cambiar la lista aquí cambia lo que se ofrece en pantalla.
+    /// </summary>
+    public static readonly int[] AllowedPageSizes = [10, 15, 25];
+
+    /// <summary>El que se usa cuando la petición no trae <c>pageSize</c>.</summary>
+    public const int DefaultPageSize = 15;
+
+    /// <summary>
+    /// Techo duro, independiente de <see cref="AllowedPageSizes"/>: acota cualquier
+    /// petición para que nadie pueda pedir un listado ilimitado escribiendo la URL.
+    /// </summary>
     public const int MaxPageSize = 100;
-    public const int DefaultPageSize = 20;
 
     private int _page = 1;
     private int _pageSize = DefaultPageSize;
@@ -34,6 +47,15 @@ public class PageRequest
     public string? Search { get; set; }
 
     public int Skip => (Page - 1) * PageSize;
+}
+
+/// <summary>Filtros del listado de usuarios.</summary>
+public sealed class UserFilter : PageRequest
+{
+    /// <summary>Filtra por rol asignado. Se resuelve en la base, no en memoria.</summary>
+    public Guid? RoleId { get; set; }
+
+    public bool? IsActive { get; set; }
 }
 
 /// <summary>Filtros del listado de productos.</summary>

@@ -271,6 +271,62 @@ namespace StockHex_API.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("StockHex_API.Domain.Entities.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Roles_Name");
+
+                    b.ToTable("Roles", (string)null);
+                });
+
+            modelBuilder.Entity("StockHex_API.Domain.Entities.RolePermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId", "Permission")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RolePermissions_RoleId_Permission");
+
+                    b.ToTable("RolePermissions", (string)null);
+                });
+
             modelBuilder.Entity("StockHex_API.Domain.Entities.Supplier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -342,10 +398,8 @@ namespace StockHex_API.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -355,6 +409,9 @@ namespace StockHex_API.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("IX_Users_Email");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("IX_Users_RoleId");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -428,6 +485,28 @@ namespace StockHex_API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("StockHex_API.Domain.Entities.RolePermission", b =>
+                {
+                    b.HasOne("StockHex_API.Domain.Entities.Role", "Role")
+                        .WithMany("Permissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("StockHex_API.Domain.Entities.User", b =>
+                {
+                    b.HasOne("StockHex_API.Domain.Entities.Role", "Role")
+                        .WithMany("Users")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("StockHex_API.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Products");
@@ -441,6 +520,13 @@ namespace StockHex_API.Migrations
             modelBuilder.Entity("StockHex_API.Domain.Entities.Product", b =>
                 {
                     b.Navigation("Movements");
+                });
+
+            modelBuilder.Entity("StockHex_API.Domain.Entities.Role", b =>
+                {
+                    b.Navigation("Permissions");
+
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("StockHex_API.Domain.Entities.Supplier", b =>

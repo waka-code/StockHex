@@ -1,16 +1,19 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import type { UserRole } from '../api/types';
+import type { PermissionKey } from '../api/types';
 import { useAuth } from './useAuth';
 
 interface Props {
   children: ReactNode;
-  /** Si se indica, además de estar autenticado hay que tener uno de estos roles. */
-  roles?: readonly UserRole[];
+  /**
+   * Permiso necesario además de estar autenticado. Es un espejo del que exige el
+   * endpoint: evita que la pantalla se monte para luego llenarse de 403.
+   */
+  permission?: PermissionKey;
 }
 
-export function RequireAuth({ children, roles }: Props) {
-  const { user, isAuthenticated } = useAuth();
+export function RequireAuth({ children, permission }: Props) {
+  const { user, isAuthenticated, can } = useAuth();
   const location = useLocation();
 
   if (!isAuthenticated || !user) {
@@ -18,8 +21,8 @@ export function RequireAuth({ children, roles }: Props) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/sin-acceso" replace />;
+  if (permission && !can(permission)) {
+    return <Navigate to="/sin-acceso" replace state={{ permission }} />;
   }
 
   return <>{children}</>;

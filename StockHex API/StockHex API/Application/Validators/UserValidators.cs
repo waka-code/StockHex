@@ -33,8 +33,8 @@ public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserReq
         RuleFor(x => x.ConfirmPassword)
             .Equal(x => x.Password).WithMessage("Las contraseñas no coinciden.");
 
-        RuleFor(x => x.Role)
-            .IsInEnum().WithMessage("El rol debe ser Admin (1), Manager (2) u Operator (3).");
+        RuleFor(x => x.RoleId)
+            .NotEmpty().WithMessage("El rol es obligatorio.");
     }
 }
 
@@ -51,8 +51,23 @@ public sealed class UpdateUserRequestValidator : AbstractValidator<UpdateUserReq
             .EmailAddress().WithMessage("El email no tiene un formato válido.")
             .MaximumLength(150);
 
-        RuleFor(x => x.Role)
-            .IsInEnum().WithMessage("El rol debe ser Admin (1), Manager (2) u Operator (3).");
+        RuleFor(x => x.RoleId)
+            .NotEmpty().WithMessage("El rol es obligatorio.");
+    }
+}
+
+/// <summary>
+/// Restablecimiento hecho por otra persona: no hay contraseña actual que validar,
+/// pero la nueva cumple las mismas reglas de fuerza.
+/// </summary>
+public sealed class ResetPasswordRequestValidator : AbstractValidator<ResetPasswordRequest>
+{
+    public ResetPasswordRequestValidator()
+    {
+        RuleFor(x => x.NewPassword).Password();
+
+        RuleFor(x => x.ConfirmPassword)
+            .Equal(x => x.NewPassword).WithMessage("Las contraseñas no coinciden.");
     }
 }
 

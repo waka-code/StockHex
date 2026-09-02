@@ -57,7 +57,17 @@ public sealed class ClientRepository : IClientRepository
     public async Task AddAsync(Client client, CancellationToken cancellationToken = default) =>
         await _context.Clients.AddAsync(client, cancellationToken);
 
-    public void Update(Client client) => _context.Clients.Update(client);
+    /// <summary>
+    /// Con la entidad ya rastreada no hace falta hacer nada: el tracker detecta los
+    /// cambios solo. Llamar a Update() marcaría todo el grafo como Modified,
+    /// incluidos los hijos recién añadidos, y EF intentaría un UPDATE de filas que
+    /// todavía no existen. Sólo una entidad desprendida necesita adjuntarse.
+    /// </summary>
+    public void Update(Client client)
+    {
+        if (_context.Entry(client).State == EntityState.Detached)
+            _context.Clients.Update(client);
+    }
 
     public void Remove(Client client) => _context.Clients.Remove(client);
 }

@@ -30,7 +30,8 @@ puerto, agrégalo a `Cors:AllowedOrigins` (acepta una lista separada por `;`).
 | `npm run build` | Compila tipos y genera `dist/` |
 | `npm run typecheck` | Sólo verifica tipos |
 | `npm run lint` | oxlint sobre `src/` |
-| `npm run e2e` | Suite en navegador real (ver abajo) |
+| `npm run e2e` | Las 5 suites en navegador real, espaciadas (ver abajo) |
+| `npm run e2e:<suite>` | Una suite suelta: `smoke`, `roles`, `refresh`, `rbac`, `filters`, `proxy` |
 
 ---
 
@@ -68,6 +69,14 @@ las variables (`color: 'var(--ink2)'`). Sin cascada que sorprenda y sin un archi
 de CSS que crezca en paralelo a los componentes. `base.css` sólo tiene el reset, la
 tipografía y el responsive del cascarón.
 
+**Los filtros viven en la URL, no en `useState`.** `lib/urlFilters.ts` es el único
+hook que sincroniza filtros, búsqueda y paginación con los query params: refrescar
+conserva la consulta y copiar el enlace reconstruye la pantalla. Los valores por
+defecto no se escriben en la URL, y cambiar un filtro descarta la página. El
+selector de filas por página (**10, 15 o 25**, 15 por omisión) lo pinta `Pager`, y
+el tamaño elegido se le pide a la API: la tabla nunca recorta en memoria.
+Detalle en las reglas 4 y 8 de [`CLAUDE.md`](../CLAUDE.md).
+
 **TanStack Query para el estado del servidor.** La paginación, el caché y la
 invalidación tras cada mutación no se escriben a mano. Un movimiento invalida
 `products`, `movements` y `reports` de una vez, porque los tres cambian.
@@ -82,8 +91,8 @@ API — queda como pendiente.
 
 ## Renovación de sesión
 
-El access token dura 60 minutos y el refresco 14 días. `src/api/client.ts` lo maneja
-solo:
+El access token dura 60 minutos y el refresco 14 días —en `Development` la API sube
+el access a 480 minutos—. `src/api/client.ts` lo maneja solo:
 
 1. **Renovación anticipada** — si al access token le queda menos de un minuto, se
    canjea antes de salir, sin gastar un 401 y una segunda ida al servidor.
@@ -100,19 +109,46 @@ Verificado en navegador: tres peticiones fallando simultáneamente producen
 
 ---
 
-## Roles
+## Roles y permisos
 
-El menú y los botones se arman según el rol del token:
+El menú, los botones y las rutas se derivan de los **permisos**, no del nombre del
+rol: un rol nuevo aparece en el menú correcto sin tocar el frontend.
 
-| Rol | Secciones | Escribe catálogo | Revierte movimientos |
-|---|---|---|---|
-| `Admin` | 8 | sí | sí |
-| `Manager` | 7 (sin Usuarios) | sí | sí |
-| `Operator` | 4 | no | no |
+```tsx
+const { can } = useAuth();
+const canCreate = can(P.products.create);
+```
 
-`RequireAuth` bloquea además las rutas escritas a mano. **La interfaz sólo esconde
-lo que el rol no puede usar; la autorización real la impone la API**, que responde
-`403` si se pide el endpoint directamente. Nunca se confía en el frontend para eso.
+| Pieza | Qué hace |
+|---|---|
+| `auth/permissions.ts` → `P` | Las claves que la interfaz necesita nombrar, como constantes |
+| `auth/roles.ts` → `NAV` | Cada sección declara el permiso que la habilita |
+| `useAuth().can(clave)` | Comprueba un permiso del usuario en curso |
+| `RequireAuth permission={…}` | Bloquea la ruta escrita a mano |
+| `usePermissionCatalog()` | Pide el catálogo a `GET /api/permissions` |
+| `components/PermissionMatrix` | La rejilla de módulos × acciones del editor de roles |
+
+Con los tres roles que crea la migración: `Administrador` ve 9 secciones,
+`Jefe de bodega` 7 y `Bodeguero` 4.
+
+**El catálogo no se declara aquí.** `P` es sólo el subconjunto de claves que el código
+de la interfaz menciona; el catálogo completo vive en el backend y se consume de
+`GET /api/permissions` (regla 7 de [`CLAUDE.md`](../CLAUDE.md)).
+
+**La interfaz sólo esconde lo que el permiso no habilita; la autorización real la
+impone la API**, que responde `403` si se pide el endpoint directamente. Nunca se
+confía en el frontend para eso.
+
+### Editor de permisos
+
+`pages/RoleEditor.tsx` monta la matriz: 9 módulos × 4 acciones estándar, más una
+columna de **especiales** para las tres que sólo tiene un módulo (`movements.reverse`,
+`reports.export`, `users.change_password`). Sin esa columna la rejilla se llenaría de
+guiones.
+
+Marcar *Crear*, *Editar* o *Eliminar* arrastra el *Ver* del módulo: sin él la pantalla
+no se puede abrir y el permiso quedaría inalcanzable. Quitar *Ver* limpia el módulo
+entero.
 
 ---
 
@@ -143,26 +179,31 @@ src/
 │  └─ problem.ts     ProblemDetails → ApiError tipado
 ├─ auth/
 │  ├─ AuthContext.tsx   sesión en React, sincronizada con el cliente HTTP
-│  ├─ RequireAuth.tsx   guarda de ruta, por autenticación y por rol
-│  ├─ roles.ts          menú y permisos por rol
+│  ├─ RequireAuth.tsx   guarda de ruta, por autenticación y por permiso
+│  ├─ roles.ts          menú derivado de permisos
 │  └─ storage.ts        persistencia de la sesión
 ├─ components/
 │  ├─ Shell.tsx      barra lateral + barra superior + responsive
-│  ├─ DataTable.tsx  tabla densa + paginación
+│  ├─ DataTable.tsx  tabla densa + paginación con selector de filas
 │  ├─ Field.tsx      controles de formulario con error por campo
 │  ├─ Modal.tsx      modal y confirmación
 │  ├─ Toast.tsx      avisos, con traducción de errores de API
 │  ├─ Icon.tsx       iconos SVG en JSX
+│  ├─ PermissionMatrix.tsx  módulos × acciones del editor de roles
+│  ├─ tokens.ts     cómo se ve cada tipo de movimiento, en un solo lugar
 │  ├─ ThemeToggle.tsx
 │  └─ ui.tsx         botón, chip, tarjeta, KPI, aviso, estado vacío
 ├─ pages/
 │  ├─ Login.tsx  Dashboard.tsx  Products.tsx  ProductDetail.tsx
 │  ├─ Movements.tsx  MovementForm.tsx  Reports.tsx  Users.tsx
+│  ├─ Roles.tsx      RoleEditor.tsx  la matriz de permisos por rol
 │  ├─ CrudPage.tsx   patrón compartido de Categorías/Proveedores/Clientes
-│  └─ Catalog.tsx    las tres pantallas que usan ese patrón
+│  ├─ Catalog.tsx    las tres pantallas que usan ese patrón
+│  └─ NoAccess.tsx   NotFound.tsx
 ├─ lib/
-│  ├─ format.ts   pesos chilenos, fechas en 24 h, iniciales
-│  └─ hooks.ts    cabecera de página, debounce, reinicio de paginación
+│  ├─ format.ts      pesos chilenos, fechas en 24 h, iniciales
+│  ├─ urlFilters.ts  filtros, búsqueda y paginación derivados de la URL
+│  └─ hooks.ts       cabecera de página
 └─ styles/
    ├─ tokens.css  el sistema de diseño, claro y oscuro
    └─ base.css    reset, tipografía, responsive del cascarón
@@ -179,25 +220,30 @@ que un test de render aislado. La suite usa Playwright directamente.
 ```bash
 npx playwright install chromium   # una vez
 
-# Contra el servidor de desarrollo (:5173)
-npm run e2e
-
-# Contra el stack dockerizado (:8080)
-APP_URL=http://localhost:8080 npm run e2e
-npm run e2e:proxy
+npm run e2e                                   # contra el stack dockerizado (:8080)
+APP_URL=http://localhost:5173 npm run e2e     # contra el servidor de Vite
+npm run e2e:proxy                             # sólo tiene sentido en Docker
 ```
+
+El destino es **uno para toda la tanda**. Antes cada archivo traía su propio defecto
+y tres apuntaban a Vite mientras las otras iban al contenedor: una tanda «en verde»
+no verificaba un despliegue, sino dos a medias.
 
 | Archivo | Qué verifica |
 |---|---|
-| `e2e/smoke.mjs` | 21 pasos: login, error de credenciales, las 8 secciones, filtro de stock bajo, aviso de stock insuficiente antes de enviar, registro real de un movimiento, tema oscuro, vista móvil de 390 px |
+| `e2e/smoke.mjs` | 22 pasos: login, error de credenciales, las 9 secciones, filtro de stock bajo, aviso de stock insuficiente antes de enviar, registro real de un movimiento, tema oscuro, vista móvil de 390 px |
 | `e2e/roles.mjs` | Los tres roles: cuántas secciones ve cada uno, qué botones aparecen, y que las rutas escritas a mano queden bloqueadas |
 | `e2e/refresh.mjs` | Token corrupto → renueva sin expulsar; tres fallos simultáneos → **una sola** renovación; refresco inválido → login; logout → token revocado en el servidor |
 | `e2e/proxy.mjs` | El despliegue dockerizado: un solo origen, sin cabeceras CORS, fallback de SPA, y que el límite de intentos **no se eluda** falsificando `X-Forwarded-For` |
+| `e2e/rbac.mjs` | Roles y permisos: la matriz, que marcar Crear arrastre Ver, guardar contra la API, crear un rol partiendo de otro, el reset de contraseña, el filtro por rol resuelto en el servidor, y que un rol sin permisos vea menos |
+| `e2e/filters.mjs` | Que los filtros vivan en la URL (regla 4): refrescar conserva el estado, el enlace compartido reconstruye la pantalla, cambiar un filtro descarta la página, y el selector de filas por página pide el tamaño a la API |
 
 Las capturas quedan en `e2e/shots/`.
 
-> La suite consume el límite de intentos de `/api/auth` (10 por minuto). Si la
-> corres varias veces seguidas verás `429`; espera un minuto.
+> Una tanda completa hace más de 10 logins y el limitador de `/api/auth` acepta 10
+> por minuto, así que `npm run e2e` **espera entre suite y suite** (`e2e/run.mjs`).
+> Por eso tarda varios minutos; una suite suelta es inmediata. Si corres dos tandas
+> seguidas, deja pasar un minuto entre ellas.
 
 ---
 
@@ -205,7 +251,8 @@ Las capturas quedan en `e2e/shots/`.
 
 - Tests unitarios de `format.ts` y del cliente HTTP
 - Cookie `HttpOnly` para el refresh token, en vez de `localStorage`
-- Cambio de contraseña desde la interfaz (el endpoint existe: `POST /api/users/me/change-password`)
+- Cambio de la **propia** contraseña desde la interfaz (el endpoint existe:
+  `POST /api/users/me/change-password`; el reset de otro usuario ya está)
 - Cierre de sesión en todos los dispositivos (el endpoint lo soporta con `allSessions`)
-- Exportar reportes a CSV
+- Exportar reportes a CSV — el permiso `reports.export` ya existe y espera su endpoint
 - Servir el frontend con HTTP/2 y TLS (hoy el contenedor habla HTTP)

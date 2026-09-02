@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ApiError } from './api/problem';
 import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
+import { P } from './auth/permissions';
 import { Shell } from './components/Shell';
 import { ToastProvider } from './components/Toast';
 import { Categories, Clients, Suppliers } from './pages/Catalog';
@@ -14,6 +15,8 @@ import { NotFound } from './pages/NotFound';
 import { ProductDetail } from './pages/ProductDetail';
 import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
+import { RoleEditor } from './pages/RoleEditor';
+import { Roles } from './pages/Roles';
 import { Users } from './pages/Users';
 
 const queryClient = new QueryClient({
@@ -44,27 +47,50 @@ export function App() {
               <Route path="/login" element={<Login />} />
 
               <Route element={<RequireAuth><Shell /></RequireAuth>}>
-                <Route index element={<Dashboard />} />
-                <Route path="productos" element={<Products />} />
-                <Route path="productos/:id" element={<ProductDetail />} />
-                <Route path="movimientos" element={<Movements />} />
-                <Route path="reportes" element={<Reports />} />
-
+                {/* Cada ruta declara el mismo permiso que exige su endpoint. */}
+                <Route
+                  index
+                  element={<RequireAuth permission={P.dashboard.view}><Dashboard /></RequireAuth>}
+                />
+                <Route
+                  path="productos"
+                  element={<RequireAuth permission={P.products.view}><Products /></RequireAuth>}
+                />
+                <Route
+                  path="productos/:id"
+                  element={<RequireAuth permission={P.products.view}><ProductDetail /></RequireAuth>}
+                />
+                <Route
+                  path="movimientos"
+                  element={<RequireAuth permission={P.movements.view}><Movements /></RequireAuth>}
+                />
+                <Route
+                  path="reportes"
+                  element={<RequireAuth permission={P.reports.view}><Reports /></RequireAuth>}
+                />
                 <Route
                   path="categorias"
-                  element={<RequireAuth roles={['Admin', 'Manager']}><Categories /></RequireAuth>}
+                  element={<RequireAuth permission={P.categories.view}><Categories /></RequireAuth>}
                 />
                 <Route
                   path="proveedores"
-                  element={<RequireAuth roles={['Admin', 'Manager']}><Suppliers /></RequireAuth>}
+                  element={<RequireAuth permission={P.suppliers.view}><Suppliers /></RequireAuth>}
                 />
                 <Route
                   path="clientes"
-                  element={<RequireAuth roles={['Admin', 'Manager']}><Clients /></RequireAuth>}
+                  element={<RequireAuth permission={P.clients.view}><Clients /></RequireAuth>}
                 />
                 <Route
                   path="usuarios"
-                  element={<RequireAuth roles={['Admin']}><Users /></RequireAuth>}
+                  element={<RequireAuth permission={P.users.view}><Users /></RequireAuth>}
+                />
+                <Route
+                  path="roles"
+                  element={<RequireAuth permission={P.roles.view}><Roles /></RequireAuth>}
+                />
+                <Route
+                  path="roles/:id"
+                  element={<RequireAuth permission={P.roles.view}><RoleEditor /></RequireAuth>}
                 />
 
                 <Route path="sin-acceso" element={<NoAccess />} />

@@ -3,7 +3,6 @@ using StockHex_API.Application.DTOs;
 using StockHex_API.Application.UseCases.AuthUseCases;
 using StockHex_API.Domain.Common;
 using StockHex_API.Domain.Entities;
-using StockHex_API.Domain.Enums;
 using StockHex_API.Infrastructure.Persistence;
 using StockHex_API.Infrastructure.Repositories;
 using StockHex_API.Infrastructure.Security;
@@ -31,7 +30,8 @@ public sealed class RefreshTokenTests
 
     private static Login BuildLogin(ApplicationDbContext context) =>
         new(new UserRepository(context), Hasher,
-            new IssueTokens(BuildTokenService(), new RefreshTokenRepository(context)), context);
+            new IssueTokens(BuildTokenService(), new RefreshTokenRepository(context),
+                new StubPermissionResolver(context)), context);
 
     private static RefreshAccessToken BuildRefresh(ApplicationDbContext context)
     {
@@ -42,7 +42,7 @@ public sealed class RefreshTokenTests
             repository,
             new UserRepository(context),
             tokenService,
-            new IssueTokens(tokenService, repository),
+            new IssueTokens(tokenService, repository, new StubPermissionResolver(context)),
             context);
     }
 
@@ -52,7 +52,7 @@ public sealed class RefreshTokenTests
 
     private static async Task<(User User, AuthResponse Auth)> LoginAsync(ApplicationDbContext context)
     {
-        var user = TestData.User(UserRole.Admin, "admin@test.local", Hasher.Hash("Password123"));
+        var user = TestData.User(email: "admin@test.local", passwordHash: Hasher.Hash("Password123"));
         context.Add(user);
         await context.SaveChangesAsync();
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { reports } from '../api/endpoints';
@@ -10,6 +10,7 @@ import {
 import { MOVEMENT } from '../components/tokens';
 import { clp, dateOnly, num, toDateInput } from '../lib/format';
 import { usePageMeta } from '../lib/hooks';
+import { dateParam, numberParam, pageSizeParam, useUrlFilters } from '../lib/urlFilters';
 
 function defaultRange(): { from: string; to: string } {
   const to = new Date();
@@ -19,18 +20,25 @@ function defaultRange(): { from: string; to: string } {
 }
 
 export function Reports() {
-  const [page, setPage] = useState(1);
+  // El rango por defecto son los últimos 30 días, y se calcula una sola vez para
+  // que sea el valor por omisión del parámetro y no ensucie la URL.
   const initial = useMemo(() => defaultRange(), []);
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
+
+  const filters = useUrlFilters({
+    page: numberParam(1, { min: 1, pagination: true }),
+    pageSize: pageSizeParam(),
+    from: dateParam(initial.from),
+    to: dateParam(initial.to),
+  });
+  const { page, pageSize, from, to } = filters.values;
 
   const summary = useQuery({
     queryKey: ['reports', 'inventory-summary'],
     queryFn: () => reports.inventorySummary() });
 
   const lowStock = useQuery({
-    queryKey: ['reports', 'low-stock', { page, pageSize: 20 }],
-    queryFn: () => reports.lowStock({ page, pageSize: 20 }) });
+    queryKey: ['reports', 'low-stock', { page, pageSize }],
+    queryFn: () => reports.lowStock({ page, pageSize }) });
 
   const movementSummary = useQuery({
     queryKey: ['reports', 'movement-summary', from, to],
@@ -145,19 +153,14 @@ export function Reports() {
         />
         <FilterBar
           right={(
-            <Button
-              icon="clock"
-              onClick={() => { const d = defaultRange(); setFrom(d.from); setTo(d.to); }}
-            >
-              Últimos 30 días
-            </Button>
+            <Button icon="clock" onClick={filters.reset}>Últimos 30 días</Button>
           )}
         >
           <Field label="Desde" width={160}>
-            <Input type="date" value={from} onChange={setFrom} />
+            <Input type="date" value={from} onChange={(v) => filters.set('from', v)} />
           </Field>
           <Field label="Hasta" width={160}>
-            <Input type="date" value={to} onChange={setTo} />
+            <Input type="date" value={to} onChange={(v) => filters.set('to', v)} />
           </Field>
         </FilterBar>
         <DataTable
@@ -200,7 +203,14 @@ export function Reports() {
             />
           )}
         />
-        {lowStock.data ? <Pager data={lowStock.data} onPage={setPage} /> : null}
+        {lowStock.data ? (
+          <Pager
+            data={lowStock.data}
+            onPage={(p) => filters.set('page', p)}
+            pageSize={pageSize}
+            onPageSize={(size) => filters.set('pageSize', size)}
+          />
+        ) : null}
       </Card>
     </>
   );

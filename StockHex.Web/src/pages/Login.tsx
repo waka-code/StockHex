@@ -6,11 +6,17 @@ import { Field, Input } from '../components/Field';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/ui';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { MOVEMENT } from '../components/tokens';
+import type { MovementType } from '../api/types';
 
-const MOVEMENT_HELP = [
-  { name: 'Entrada', desc: 'suma al stock', icon: 'down', color: 'var(--in)' },
-  { name: 'Salida', desc: 'resta; falla si no alcanza', icon: 'right', color: 'var(--out)' },
-  { name: 'Ajuste', desc: 'fija el stock del conteo físico', icon: 'filter', color: 'var(--adj)' },
+/**
+ * El nombre, el icono y el color de cada tipo salen de `MOVEMENT`, el mismo
+ * origen que usan la tabla y los chips: aquí sólo se añade la explicación.
+ */
+const MOVEMENT_HELP: { type: MovementType; desc: string }[] = [
+  { type: 'In', desc: 'suma al stock' },
+  { type: 'Out', desc: 'resta; falla si no alcanza' },
+  { type: 'Adjustment', desc: 'fija el stock del conteo físico' },
 ];
 
 export function Login() {
@@ -178,23 +184,23 @@ export function Login() {
           </p>
           <div style={{ height: 1, background: 'var(--nav-bord)' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-            {MOVEMENT_HELP.map((item) => (
-              <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            {MOVEMENT_HELP.map(({ type, desc }) => (
+              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <span
                   style={{
                     width: 26, height: 26, borderRadius: 6, flexShrink: 0,
                     background: 'rgba(255,255,255,.05)',
-                    border: '1px solid var(--nav-bord)', color: item.color,
+                    border: '1px solid var(--nav-bord)', color: MOVEMENT[type].color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Icon name={item.icon} size={14} />
+                  <Icon name={MOVEMENT[type].icon} size={14} />
                 </span>
                 <div>
                   <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--nav-ink)' }}>
-                    {item.name}
+                    {MOVEMENT[type].label}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--nav-ink2)', marginTop: 1 }}>
-                    {item.desc}
+                    {desc}
                   </div>
                 </div>
               </div>

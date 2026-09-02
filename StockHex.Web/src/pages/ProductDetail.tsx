@@ -10,8 +10,8 @@ import {
 } from '../components/ui';
 import { clp, dateTime, dateTimeShort } from '../lib/format';
 import { usePageMeta } from '../lib/hooks';
+import { numberParam, pageSizeParam, useUrlFilters } from '../lib/urlFilters';
 import { NewMovementButton } from './MovementForm';
-import { useState } from 'react';
 
 function Definition({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -31,7 +31,14 @@ function Definition({ label, value }: { label: string; value: React.ReactNode })
 
 export function ProductDetail() {
   const { id = '' } = useParams();
-  const [page, setPage] = useState(1);
+
+  // La página del historial también va en la URL: un enlace a la página 3 del
+  // historial de un producto tiene que reconstruirse igual.
+  const filters = useUrlFilters({
+    page: numberParam(1, { min: 1, pagination: true }),
+    pageSize: pageSizeParam(),
+  });
+  const { page, pageSize } = filters.values;
 
   const product = useQuery({
     queryKey: ['products', id],
@@ -40,8 +47,8 @@ export function ProductDetail() {
   });
 
   const history = useQuery({
-    queryKey: ['movements', { productId: id, page, pageSize: 20 }],
-    queryFn: () => movements.list({ productId: id, page, pageSize: 20 }),
+    queryKey: ['movements', { productId: id, page, pageSize }],
+    queryFn: () => movements.list({ productId: id, page, pageSize }),
     enabled: Boolean(product.data),
   });
 
@@ -238,7 +245,14 @@ export function ProductDetail() {
             />
           )}
         />
-        {history.data ? <Pager data={history.data} onPage={setPage} /> : null}
+        {history.data ? (
+          <Pager
+            data={history.data}
+            onPage={(p) => filters.set('page', p)}
+            pageSize={pageSize}
+            onPageSize={(size) => filters.set('pageSize', size)}
+          />
+        ) : null}
       </Card>
     </>
   );

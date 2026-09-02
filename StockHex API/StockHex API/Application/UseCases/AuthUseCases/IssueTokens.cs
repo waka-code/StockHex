@@ -15,11 +15,16 @@ public sealed class IssueTokens
 {
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenRepository _refreshTokens;
+    private readonly IPermissionResolver _permissions;
 
-    public IssueTokens(ITokenService tokenService, IRefreshTokenRepository refreshTokens)
+    public IssueTokens(
+        ITokenService tokenService,
+        IRefreshTokenRepository refreshTokens,
+        IPermissionResolver permissions)
     {
         _tokenService = tokenService;
         _refreshTokens = refreshTokens;
+        _permissions = permissions;
     }
 
     /// <summary>
@@ -37,17 +42,21 @@ public sealed class IssueTokens
         {
             TokenHash = refresh.TokenHash,
             UserId = user.Id,
-            ExpiresAt = refresh.ExpiresAt
+            ExpiresAt = refresh.ExpiresAt,
         };
 
         await _refreshTokens.AddAsync(entity, cancellationToken);
+
+        // Los permisos van en el cuerpo, no en el token: el frontend los usa para no
+        // ofrecer acciones que van a fallar, y se releen en cada renovación.
+        var permissions = await _permissions.GetForRoleAsync(user.RoleId, cancellationToken);
 
         var response = new AuthResponse(
             accessToken,
             accessExpiresAt,
             refresh.Token,
             refresh.ExpiresAt,
-            user.ToResponse());
+            user.ToCurrentUser(permissions.OrderBy(p => p, StringComparer.Ordinal).ToList()));
 
         return (response, entity);
     }

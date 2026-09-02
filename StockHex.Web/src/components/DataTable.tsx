@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 import { EmptyState, Spinner } from './ui';
-import type { PagedResponse } from '../api/types';
+import { PAGE_SIZES, type PagedResponse, type PageSize } from '../api/types';
 
 export interface Column<T> {
   key: string;
@@ -126,9 +126,22 @@ function windowOf(page: number, total: number): number[] {
   return Array.from({ length: 5 }, (_, i) => start + i);
 }
 
+/**
+ * Paginación de una tabla. `pageSize` y `onPageSize` son opcionales: si no se
+ * pasan, la barra no ofrece el selector de filas.
+ *
+ * El tamaño elegido no se guarda aquí: quien la usa lo escribe en la URL con
+ * `useUrlFilters`, y el listado se vuelve a pedir a la API con el nuevo
+ * `pageSize`. Esta barra no recorta nada en memoria.
+ */
 export function Pager<T>({
-  data, onPage,
-}: { data: Pick<PagedResponse<T>, 'page' | 'pageSize' | 'totalCount' | 'totalPages' | 'hasPrevious' | 'hasNext'>; onPage: (page: number) => void }) {
+  data, onPage, pageSize, onPageSize,
+}: {
+  data: Pick<PagedResponse<T>, 'page' | 'pageSize' | 'totalCount' | 'totalPages' | 'hasPrevious' | 'hasNext'>;
+  onPage: (page: number) => void;
+  pageSize?: PageSize;
+  onPageSize?: (size: PageSize) => void;
+}) {
   const { page, totalCount, totalPages, hasPrevious, hasNext } = data;
   const pages = windowOf(page, totalPages);
 
@@ -152,6 +165,27 @@ export function Pager<T>({
           </>
         )}
       </span>
+
+      {pageSize !== undefined && onPageSize ? (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink2)' }}>
+          Mostrar
+          <select
+            value={pageSize}
+            onChange={(event) => onPageSize(Number(event.target.value) as PageSize)}
+            aria-label="Filas por página"
+            style={{
+              height: 26, padding: '0 6px', fontSize: 12, fontWeight: 500,
+              background: 'var(--surf)', color: 'var(--ink)',
+              border: '1px solid var(--bord2)', borderRadius: 5, cursor: 'pointer',
+            }}
+          >
+            {PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+          por página
+        </label>
+      ) : null}
 
       {totalPages > 1 ? (
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>

@@ -69,9 +69,10 @@ public sealed class ApiEndpointsTests : IClassFixture<StockHexApiFactory>, IAsyn
         var response = await client.GetAsync("/api/auth/me");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var me = await response.Content.ReadFromJsonAsync<UserResponse>(Json);
+        var me = await response.Content.ReadFromJsonAsync<CurrentUserResponse>(Json);
         me!.Email.Should().Be(StockHexApiFactory.AdminEmail);
-        me.Role.Should().Be(UserRole.Admin);
+        me.Role.Name.Should().Be("Administrador");
+        me.Permissions.Should().Contain("roles.edit", "el rol de sistema concede todo el catálogo");
     }
 
     [Fact]
@@ -83,8 +84,12 @@ public sealed class ApiEndpointsTests : IClassFixture<StockHexApiFactory>, IAsyn
         var body = await client.GetStringAsync("/api/auth/me");
 
         // Antes se serializaba la entidad completa, con el hash incluido.
+        // La comprobación es sobre el HASH, no sobre la palabra "password": el
+        // permiso users.change_password la contiene de forma legítima.
         body.Should().NotContain("passwordHash");
-        body.ToLowerInvariant().Should().NotContain("password");
+        body.Should().NotContain("PasswordHash");
+        body.Should().NotContain("$2a$", "un hash de BCrypt empieza con $2a$/$2b$");
+        body.Should().NotContain("$2b$");
     }
 
     // ------------------------------------------------------------ Autorización por rol

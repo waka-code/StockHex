@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockHex_API.Api.Extensions;
+using StockHex_API.Domain.Authorization;
 using StockHex_API.Application.DTOs;
 using StockHex_API.Application.UseCases.ProductUseCases;
 using StockHex_API.Domain.Common;
@@ -10,6 +11,7 @@ namespace StockHex_API.Api.Controllers;
 [ApiController]
 [Route("api/products")]
 [Authorize]
+[RequirePermission(Permissions.Products.View)]
 public sealed class ProductsController : ControllerBase
 {
     private readonly CreateProduct _create;
@@ -55,7 +57,7 @@ public sealed class ProductsController : ControllerBase
     /// un movimiento de entrada en <c>POST /api/inventory-movements</c>.
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = Roles.AdminOrManager)]
+    [RequirePermission(Permissions.Products.Create)]
     [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -68,7 +70,7 @@ public sealed class ProductsController : ControllerBase
 
     /// <summary>Actualiza los datos del producto. No modifica el stock.</summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Roles.AdminOrManager)]
+    [RequirePermission(Permissions.Products.Edit)]
     [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -83,7 +85,7 @@ public sealed class ProductsController : ControllerBase
     /// en lugar de borrarse, para conservar el historial.
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = Roles.AdminOrManager)]
+    [RequirePermission(Permissions.Products.Delete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

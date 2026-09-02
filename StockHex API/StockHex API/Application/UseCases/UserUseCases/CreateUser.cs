@@ -10,12 +10,18 @@ namespace StockHex_API.Application.UseCases.UserUseCases;
 public sealed class CreateUser
 {
     private readonly IUserRepository _users;
+    private readonly IRoleRepository _roles;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
 
-    public CreateUser(IUserRepository users, IPasswordHasher passwordHasher, IUnitOfWork unitOfWork)
+    public CreateUser(
+        IUserRepository users,
+        IRoleRepository roles,
+        IPasswordHasher passwordHasher,
+        IUnitOfWork unitOfWork)
     {
         _users = users;
+        _roles = roles;
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
     }
@@ -30,7 +36,7 @@ public sealed class CreateUser
             return Result<UserResponse>.Failure(
                 Error.Validation(new Dictionary<string, string[]>
                 {
-                    [nameof(request.ConfirmPassword)] = ["Las contraseñas no coinciden."]
+                    [nameof(request.ConfirmPassword)] = ["Las contraseñas no coinciden."],
                 }));
 
         // Comprobación contra la base de datos, no cargando la tabla completa en memoria.
@@ -38,12 +44,17 @@ public sealed class CreateUser
             return Result<UserResponse>.Failure(
                 Error.Conflict($"Ya existe un usuario con el email '{email}'."));
 
+        var role = await _roles.GetByIdAsync(request.RoleId, includePermissions: false, cancellationToken);
+        if (role is null)
+            return Result<UserResponse>.Failure(Error.NotFound("Rol", request.RoleId));
+
         var user = new User
         {
             Name = request.Name.Trim(),
             Email = email,
             PasswordHash = _passwordHasher.Hash(request.Password),
-            Role = request.Role
+            RoleId = role.Id,
+            Role = role,
         };
 
         await _users.AddAsync(user, cancellationToken);

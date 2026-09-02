@@ -1,4 +1,4 @@
-import type { AuthResponse, UserResponse } from '../api/types';
+import type { AuthResponse, CurrentUserResponse } from '../api/types';
 
 /**
  * Los tokens viven en localStorage para que la sesión sobreviva a recargar la
@@ -14,7 +14,7 @@ export interface StoredSession {
   expiresAt: string;
   refreshToken: string;
   refreshTokenExpiresAt: string;
-  user: UserResponse;
+  user: CurrentUserResponse;
 }
 
 export function loadSession(): StoredSession | null {

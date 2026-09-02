@@ -21,6 +21,10 @@ public class ApplicationDbContext : DbContext, IUnitOfWork
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

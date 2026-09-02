@@ -25,5 +25,8 @@ RUN chmod +x /docker-entrypoint.d/*.sh
 
 EXPOSE 80
 
+# 127.0.0.1 y no `localhost`: dentro del contenedor `localhost` resuelve primero
+# a ::1 y nginx sólo escucha en IPv4, así que la sonda daba "connection refused"
+# con el sitio funcionando perfectamente.
 HEALTHCHECK --interval=15s --timeout=4s --start-period=8s --retries=4 \
-  CMD wget -qO- http://localhost/healthz || exit 1
+  CMD wget -qO- http://127.0.0.1/healthz || exit 1

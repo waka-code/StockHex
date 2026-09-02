@@ -1,5 +1,5 @@
+using StockHex_API.Domain.Authorization;
 using StockHex_API.Domain.Entities;
-using StockHex_API.Domain.Enums;
 
 namespace StockHex_API.Tests.Common;
 
@@ -44,17 +44,57 @@ internal static class TestData
         CategoryId = categoryId
     };
 
+    /// <summary>
+    /// Rol con los permisos indicados. Sin argumentos concede todo el catálogo,
+    /// que es lo que necesita la mayoría de los tests para no tropezar con los
+    /// guardias de acceso crítico.
+    /// </summary>
+    public static Role Role(
+        string name = "Administrador",
+        bool isSystem = true,
+        IEnumerable<string>? permissions = null)
+    {
+        var role = new Role
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Description = $"Rol de prueba: {name}",
+            IsSystem = isSystem
+        };
+
+        foreach (var key in permissions ?? Permissions.All)
+            role.Permissions.Add(new RolePermission { RoleId = role.Id, Permission = key });
+
+        return role;
+    }
+
+    /// <summary>Rol de menor privilegio, sin permisos de administración.</summary>
+    public static Role OperatorRole() => Role("Bodeguero", isSystem: false, permissions:
+    [
+        Permissions.Dashboard.View,
+        Permissions.Products.View,
+        Permissions.Movements.View,
+        Permissions.Movements.Create,
+        Permissions.Reports.View
+    ]);
+
     public static User User(
-        UserRole role = UserRole.Operator,
+        Role? role = null,
         string email = "user@test.local",
         string passwordHash = "hash",
-        bool isActive = true) => new()
+        bool isActive = true)
     {
-        Id = Guid.NewGuid(),
-        Name = "Usuario de prueba",
-        Email = email,
-        PasswordHash = passwordHash,
-        Role = role,
-        IsActive = isActive
-    };
+        role ??= Role();
+
+        return new User
+        {
+            Id = Guid.NewGuid(),
+            Name = "Usuario de prueba",
+            Email = email,
+            PasswordHash = passwordHash,
+            RoleId = role.Id,
+            Role = role,
+            IsActive = isActive
+        };
+    }
 }

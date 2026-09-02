@@ -56,6 +56,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
 
         services.AddScoped<DatabaseSeeder>();
 
@@ -87,6 +88,12 @@ public static class InfrastructureServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+
+        // Resolver de permisos: singleton con caché propia, porque la consulta está
+        // en el camino caliente de cada petición autorizada.
+        services.AddMemoryCache();
+        services.AddSingleton<IPermissionResolver, PermissionResolver>();
+        services.AddScoped<IDefaultRoleProvider, DefaultRoleProvider>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();

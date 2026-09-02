@@ -1,19 +1,27 @@
 import { chromium } from 'playwright';
 
 const OUT = process.env.SHOTS ?? 'e2e/shots';
-const APP = process.env.APP_URL ?? 'http://localhost:5173';
+const APP = process.env.APP_URL ?? 'http://localhost:8080';
 const errors = [];
 const failedRequests = [];
+// El paso de credenciales incorrectas provoca a propósito un 401 en
+// /api/auth/login, con su error de consola. Se marca como esperado mientras
+// dura ese paso; sin esto la suite nunca podía terminar en verde.
+let expectingLoginFailure = false;
+const expected = (text) => expectingLoginFailure && /401|Unauthorized|auth\/login/i.test(text);
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
 
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('console', (m) => {
+  if (m.type() === 'error' && !expected(m.text())) errors.push(m.text());
+});
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('requestfailed', (r) => failedRequests.push(`${r.method()} ${r.url()} — ${r.failure()?.errorText}`));
 page.on('response', (r) => {
   if (r.status() >= 400 && r.url().includes('/api/')) {
-    failedRequests.push(`${r.status()} ${r.request().method()} ${r.url().replace('http://localhost:8080','')}`);
+    const line = `${r.status()} ${r.request().method()} ${r.url().replace('http://localhost:8080', '')}`;
+    if (!expected(line)) failedRequests.push(line);
   }
 });
 
@@ -32,10 +40,12 @@ await step('carga /login', async () => {
 await shot('01-login');
 
 await step('credenciales incorrectas muestran el error', async () => {
+  expectingLoginFailure = true;
   await page.fill('input[name=email]', 'admin@stockhex.local');
   await page.fill('input[name=password]', 'incorrecta');
   await page.click('button[type=submit]');
   await page.waitForSelector('text=Email o contraseña incorrectos', { timeout: 10000 });
+  expectingLoginFailure = false;
 });
 await shot('02-login-error');
 
@@ -47,13 +57,15 @@ await step('login correcto entra al dashboard', async () => {
 await page.waitForTimeout(900);
 await shot('03-dashboard');
 
-await step('el rol Admin aparece en la barra superior', async () => {
-  await page.waitForSelector('text=Admin', { timeout: 5000 });
+await step('el rol aparece en la barra superior', async () => {
+  // El nombre del rol es un dato, no un enum: viene de la tabla Roles.
+  await page.waitForSelector('text=Administrador', { timeout: 5000 });
 });
 
-await step('el menú tiene las 8 secciones de Admin', async () => {
+await step('el menú tiene las 9 secciones del rol de sistema', async () => {
+  // 9 desde el RBAC: se sumó Roles. El rol de sistema concede todo el catálogo.
   const count = await page.locator('nav a').count();
-  if (count !== 8) throw new Error(`esperaba 8 items, hay ${count}`);
+  if (count !== 9) throw new Error(`esperaba 9 items, hay ${count}`);
 });
 
 // ─────────────────────────────────────────── productos
@@ -130,7 +142,8 @@ for (const [label, marker, file] of [
   ['Categorías', 'Una categoría con productos', '11-categorias'],
   ['Proveedores', 'Los proveedores son la contraparte', '12-proveedores'],
   ['Clientes', 'Los clientes son la contraparte', '13-clientes'],
-  ['Usuarios', 'Sección exclusiva de Admin', '14-usuarios'],
+  ['Usuarios', 'roles configurables', '14-usuarios'],
+  ['Roles', 'Los roles son datos', '15-roles'],
 ]) {
   await step(`navega a ${label}`, async () => {
     await page.click(`nav a:has-text("${label}")`);
@@ -171,4 +184,4 @@ console.log(`  peticiones fallidas: ${failedRequests.length}`);
 failedRequests.slice(0, 8).forEach((r) => console.log(`    · ${r.slice(0, 160)}`));
 
 await browser.close();
-process.exit(errors.length > 0 ? 1 : 0);
+process.exit(errors.length + failedRequests.length > 0 ? 1 : 0);

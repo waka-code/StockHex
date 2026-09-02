@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { clients, movements, products, suppliers } from '../api/endpoints';
 import type { MovementResponse, MovementType } from '../api/types';
-import { useCurrentUser } from '../auth/useAuth';
-import { can } from '../auth/roles';
+import { useAuth, useCurrentUser } from '../auth/useAuth';
+import { P } from '../auth/permissions';
 import { DataTable, Pager, type Column } from '../components/DataTable';
 import { Field, FilterBar, Input, SearchInput, Select, TextArea, Toggle } from '../components/Field';
 import { Icon } from '../components/Icon';
@@ -14,7 +14,10 @@ import {
   Button, Card, Chip, EmptyState, Kpi, MovementChip, MovementQuantity, Note } from '../components/ui';
 import { MOVEMENT } from '../components/tokens';
 import { clp, dateTime, dateTimeShort, num } from '../lib/format';
-import { useDebounced, usePageMeta, useResetPageOnFilterChange } from '../lib/hooks';
+import { usePageMeta } from '../lib/hooks';
+import {
+  boolParam, dateParam, enumParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
+} from '../lib/urlFilters';
 import { NewMovementButton } from './MovementForm';
 
 const REVERSE_FORM = 'reverse-form';
@@ -106,25 +109,32 @@ function ReverseModal({
 
 export function Movements() {
   const user = useCurrentUser();
-  const canReverse = can.reverseMovements(user.role);
+  const { can } = useAuth();
+  const canReverse = can(P.movements.reverse);
 
-  const [page, setPage] = useState(1);
-  const [searchInput, setSearchInput] = useState('');
-  const search = useDebounced(searchInput);
-  const [productId, setProductId] = useState('');
-  const [type, setType] = useState('');
-  const [partyKind, setPartyKind] = useState('');
-  const [partyId, setPartyId] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [onlyMine, setOnlyMine] = useState(false);
+  const filters = useUrlFilters({
+    page: numberParam(1, { min: 1, pagination: true }),
+    pageSize: pageSizeParam(),
+    search: stringParam(),
+    productId: stringParam(),
+    type: enumParam(['', 'In', 'Out', 'Adjustment'] as const, ''),
+    partyKind: enumParam(['', 'supplier', 'client'] as const, ''),
+    partyId: stringParam(),
+    from: dateParam(),
+    to: dateParam(),
+    onlyMine: boolParam(),
+  });
+  const {
+    page, pageSize, search, productId, type, partyKind, partyId, from, to, onlyMine,
+  } = filters.values;
+
+  const [searchInput, setSearchInput] = useDebouncedParam(
+    search, (value) => filters.set('search', value));
+
   const [reversing, setReversing] = useState<MovementResponse | null>(null);
 
-  const filterKey = `${search}|${productId}|${type}|${partyKind}:${partyId}|${from}|${to}|${onlyMine}`;
-  useResetPageOnFilterChange(filterKey, page, setPage);
-
   const query = useMemo(() => ({
-    page, pageSize: 20,
+    page, pageSize,
     search: search || undefined,
     productId: productId || undefined,
     movementType: (type || undefined) as MovementType | undefined,
@@ -134,7 +144,7 @@ export function Movements() {
     // La API compara contra MovementDate en UTC; el inicio y el fin del día
     // local se envían completos para que el rango incluya ambos extremos.
     from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
-    to: to ? new Date(`${to}T23:59:59`).toISOString() : undefined }), [page, search, productId, type, partyKind, partyId, onlyMine, user.id, from, to]);
+    to: to ? new Date(`${to}T23:59:59`).toISOString() : undefined }), [page, pageSize, search, productId, type, partyKind, partyId, onlyMine, user.id, from, to]);
 
   const list = useQuery({
     queryKey: ['movements', query],
@@ -268,11 +278,6 @@ export function Movements() {
       )) }] : []),
   ];
 
-  const filtered = Boolean(search || productId || type || partyId || from || to || onlyMine);
-  const clearAll = () => {
-    setSearchInput(''); setProductId(''); setType('');
-    setPartyKind(''); setPartyId(''); setFrom(''); setTo(''); setOnlyMine(false);
-  };
 
   return (
     <>
@@ -299,26 +304,36 @@ export function Movements() {
             <>
               <SearchInput value={searchInput} onChange={setSearchInput}
                 placeholder="Buscar en comentarios…" width={210} />
-              {filtered ? <Button icon="x" onClick={clearAll}>Limpiar</Button> : null}
+              {filters.isFiltered ? <Button icon="x" onClick={filters.reset}>Limpiar</Button> : null}
             </>
           )}
         >
           <Field label="Producto" width={180}>
-            <Select value={productId} onChange={setProductId} placeholder="Todos"
+            <Select value={productId} onChange={(v) => filters.set('productId', v)} placeholder="Todos"
               options={(productList.data?.items ?? []).map((p) => ({
                 value: p.id, label: `${p.sku} · ${p.name}` }))} />
           </Field>
           <Field label="Tipo" width={126}>
-            <Select value={type} onChange={setType} placeholder="Todos" options={[
-              { value: 'In', label: 'Entrada' },
-              { value: 'Out', label: 'Salida' },
-              { value: 'Adjustment', label: 'Ajuste' },
-            ]} />
+            <Select
+              value={type}
+              onChange={(v) => filters.set(
+                'type', v === 'In' || v === 'Out' || v === 'Adjustment' ? v : '')}
+              placeholder="Todos"
+              options={[
+                { value: 'In', label: 'Entrada' },
+                { value: 'Out', label: 'Salida' },
+                { value: 'Adjustment', label: 'Ajuste' },
+              ]}
+            />
           </Field>
           <Field label="Contraparte" width={140}>
             <Select
               value={partyKind}
-              onChange={(value) => { setPartyKind(value); setPartyId(''); }}
+              onChange={(value) => filters.setMany({
+                partyKind: value === 'supplier' || value === 'client' ? value : '',
+                // La contraparte concreta deja de tener sentido al cambiar de tipo.
+                partyId: '',
+              })}
               placeholder="Cualquiera"
               options={[
                 { value: 'supplier', label: 'Proveedor' },
@@ -328,19 +343,20 @@ export function Movements() {
           </Field>
           {partyKind ? (
             <Field label={partyKind === 'supplier' ? '¿Cuál?' : '¿Cuál?'} width={160}>
-              <Select value={partyId} onChange={setPartyId} placeholder="Todos"
+              <Select value={partyId} onChange={(v) => filters.set('partyId', v)} placeholder="Todos"
                 options={((partyKind === 'supplier' ? supplierList.data : clientList.data)?.items ?? [])
                   .map((item) => ({ value: item.id, label: item.name }))} />
             </Field>
           ) : null}
           <Field label="Desde" width={140}>
-            <Input type="date" value={from} onChange={setFrom} />
+            <Input type="date" value={from} onChange={(v) => filters.set('from', v)} />
           </Field>
           <Field label="Hasta" width={140}>
-            <Input type="date" value={to} onChange={setTo} />
+            <Input type="date" value={to} onChange={(v) => filters.set('to', v)} />
           </Field>
           <Field label="Usuario" width={148}>
-            <Toggle checked={onlyMine} onChange={setOnlyMine} label="Solo los míos" />
+            <Toggle checked={onlyMine} onChange={(v) => filters.set('onlyMine', v)}
+              label="Solo los míos" />
           </Field>
         </FilterBar>
 
@@ -352,18 +368,27 @@ export function Movements() {
           rowTone={(row) => (row.reversalOfMovementId ? 'var(--surf2)' : undefined)}
           empty={(
             <EmptyState
-              title={filtered ? 'Sin movimientos con estos filtros' : 'Todavía no hay movimientos'}
-              detail={filtered
+              title={filters.isFiltered
+                ? 'Sin movimientos con estos filtros'
+                : 'Todavía no hay movimientos'}
+              detail={filters.isFiltered
                 ? 'Prueba con otro rango de fechas o limpia los filtros.'
                 : 'El stock de los productos empieza en cero y sólo cambia registrando movimientos.'}
-              action={filtered
-                ? <Button icon="x" size="sm" onClick={clearAll}>Limpiar filtros</Button>
+              action={filters.isFiltered
+                ? <Button icon="x" size="sm" onClick={filters.reset}>Limpiar filtros</Button>
                 : undefined}
             />
           )}
         />
 
-        {list.data ? <Pager data={list.data} onPage={setPage} /> : null}
+        {list.data ? (
+          <Pager
+            data={list.data}
+            onPage={(p) => filters.set('page', p)}
+            pageSize={pageSize}
+            onPageSize={(size) => filters.set('pageSize', size)}
+          />
+        ) : null}
       </Card>
 
       {reversing ? <ReverseModal movement={reversing} onClose={() => setReversing(null)} /> : null}

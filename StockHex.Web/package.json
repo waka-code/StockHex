@@ -9,11 +9,13 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint src",
-    "e2e": "node e2e/smoke.mjs && node e2e/roles.mjs && node e2e/refresh.mjs",
+    "e2e": "node e2e/run.mjs",
     "e2e:smoke": "node e2e/smoke.mjs",
     "e2e:roles": "node e2e/roles.mjs",
     "e2e:refresh": "node e2e/refresh.mjs",
-    "e2e:proxy": "node e2e/proxy.mjs"
+    "e2e:proxy": "node e2e/proxy.mjs",
+    "e2e:rbac": "node e2e/rbac.mjs",
+    "e2e:filters": "node e2e/filters.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",

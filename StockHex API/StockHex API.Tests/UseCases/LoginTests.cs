@@ -2,7 +2,6 @@ using FluentAssertions;
 using StockHex_API.Application.DTOs;
 using StockHex_API.Application.UseCases.AuthUseCases;
 using StockHex_API.Domain.Common;
-using StockHex_API.Domain.Enums;
 using StockHex_API.Infrastructure.Persistence;
 using StockHex_API.Infrastructure.Repositories;
 using StockHex_API.Infrastructure.Security;
@@ -14,8 +13,13 @@ public sealed class LoginTests
 {
     private static readonly BCryptPasswordHasher Hasher = new();
 
+    private static Register BuildRegister(ApplicationDbContext context, Guid? registrationRoleId) =>
+        new(new UserRepository(context), new RoleRepository(context), Hasher,
+            BuildIssueTokens(context), context, new StubDefaultRoleProvider(registrationRoleId));
+
     private static IssueTokens BuildIssueTokens(ApplicationDbContext context) =>
-        new(BuildTokenService(), new RefreshTokenRepository(context));
+        new(BuildTokenService(), new RefreshTokenRepository(context),
+            new StubPermissionResolver(context));
 
     private static TokenService BuildTokenService() =>
         new(Microsoft.Extensions.Options.Options.Create(new JwtOptions
@@ -30,7 +34,7 @@ public sealed class LoginTests
     public async Task Credenciales_correctas_devuelven_token_y_actualizan_el_ultimo_ingreso()
     {
         using var context = TestDbContextFactory.Create();
-        var user = TestData.User(UserRole.Admin, "admin@test.local", Hasher.Hash("Password123"));
+        var user = TestData.User(email: "admin@test.local", passwordHash: Hasher.Hash("Password123"));
         context.Add(user);
         await context.SaveChangesAsync();
 
@@ -41,7 +45,7 @@ public sealed class LoginTests
         result.IsSuccess.Should().BeTrue();
         result.Value.AccessToken.Should().NotBeNullOrWhiteSpace();
         result.Value.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
-        result.Value.User.Role.Should().Be(UserRole.Admin);
+        result.Value.User.Role.Name.Should().Be("Administrador");
         context.Users.Single().LastLoginAt.Should().NotBeNull();
     }
 
@@ -83,14 +87,18 @@ public sealed class LoginTests
     public async Task El_registro_publico_siempre_crea_un_operador()
     {
         using var context = TestDbContextFactory.Create();
-        var useCase = new Register(new UserRepository(context), Hasher, BuildIssueTokens(context), context);
+        var role = TestData.OperatorRole();
+        context.Add(role);
+        await context.SaveChangesAsync();
+
+        var useCase = BuildRegister(context, role.Id);
 
         var result = await useCase.RunAsync(
             new RegisterRequest("Nuevo", "nuevo@test.local", "Password123", "Password123"));
 
         result.IsSuccess.Should().BeTrue();
         // Aunque el rol no se pueda enviar, se comprueba que nunca escale a Admin.
-        result.Value.User.Role.Should().Be(UserRole.Operator);
+        result.Value.User.Role.Name.Should().Be("Bodeguero");
         context.Users.Single().PasswordHash.Should().NotBe("Password123");
     }
 
@@ -98,7 +106,11 @@ public sealed class LoginTests
     public async Task El_registro_rechaza_contrasenas_que_no_coinciden()
     {
         using var context = TestDbContextFactory.Create();
-        var useCase = new Register(new UserRepository(context), Hasher, BuildIssueTokens(context), context);
+        var role = TestData.OperatorRole();
+        context.Add(role);
+        await context.SaveChangesAsync();
+
+        var useCase = BuildRegister(context, role.Id);
 
         var result = await useCase.RunAsync(
             new RegisterRequest("Nuevo", "nuevo@test.local", "Password123", "Password124"));
@@ -115,7 +127,11 @@ public sealed class LoginTests
         context.Add(TestData.User(email: "ocupado@test.local"));
         await context.SaveChangesAsync();
 
-        var useCase = new Register(new UserRepository(context), Hasher, BuildIssueTokens(context), context);
+        var role = TestData.OperatorRole();
+        context.Add(role);
+        await context.SaveChangesAsync();
+
+        var useCase = BuildRegister(context, role.Id);
 
         var result = await useCase.RunAsync(
             new RegisterRequest("Nuevo", "OCUPADO@test.local", "Password123", "Password123"));

@@ -16,6 +16,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Comprobaciones estrictas (regla 1: prohibido `any`) ─────────────────
+       `strict` va declarado, no heredado: sin él `noImplicitAny` está
+       apagado y un parámetro sin tipo se cuela como `any` implícito sin
+       que el compilador diga nada. */
+    "strict": true,
+    "noImplicitOverride": true,
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

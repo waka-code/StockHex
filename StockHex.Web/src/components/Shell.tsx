@@ -5,17 +5,21 @@ import { ThemeToggle } from './ThemeToggle';
 import { useAuth, useCurrentUser } from '../auth/useAuth';
 import { navFor } from '../auth/roles';
 import { initials } from '../lib/format';
-import type { UserRole } from '../api/types';
 
-const ROLE_TONE: Record<UserRole, { color: string; background: string }> = {
-  Admin: { color: 'var(--acc)', background: 'var(--acc-soft)' },
-  Manager: { color: 'var(--adj)', background: 'var(--adj-bg)' },
-  Operator: { color: 'var(--ink2)', background: 'var(--surf3)' },
-};
+/**
+ * El rol de sistema se distingue visualmente porque es el que no se puede
+ * eliminar ni dejar sin permisos. El resto comparte un tono neutro: con roles
+ * configurables no se puede tener un color por nombre.
+ */
+function roleTone(isSystem: boolean) {
+  return isSystem
+    ? { color: 'var(--acc)', background: 'var(--acc-soft)' }
+    : { color: 'var(--adj)', background: 'var(--adj-bg)' };
+}
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const user = useCurrentUser();
-  const items = navFor(user.role);
+  const { permissions } = useAuth();
+  const items = navFor(permissions);
 
   return (
     <aside
@@ -103,7 +107,7 @@ interface HeaderProps {
 function Header({ title, subtitle, actions, onMenu }: HeaderProps) {
   const user = useCurrentUser();
   const { logout } = useAuth();
-  const tone = ROLE_TONE[user.role];
+  const tone = roleTone(user.role.isSystem);
 
   return (
     <header
@@ -164,8 +168,9 @@ function Header({ title, subtitle, actions, onMenu }: HeaderProps) {
                 fontSize: 10, fontWeight: 500, borderRadius: 3,
                 letterSpacing: '.02em', ...tone,
               }}
+              title={user.role.isSystem ? 'Rol de sistema' : 'Rol personalizado'}
             >
-              {user.role}
+              {user.role.name}
             </span>
           </div>
         </div>

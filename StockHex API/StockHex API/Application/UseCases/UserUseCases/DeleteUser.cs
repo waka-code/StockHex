@@ -1,6 +1,6 @@
 using StockHex_API.Application.Abstractions;
+using StockHex_API.Domain.Authorization;
 using StockHex_API.Domain.Common;
-using StockHex_API.Domain.Enums;
 using StockHex_API.Domain.Interfaces;
 
 namespace StockHex_API.Application.UseCases.UserUseCases;
@@ -8,12 +8,18 @@ namespace StockHex_API.Application.UseCases.UserUseCases;
 public sealed class DeleteUser
 {
     private readonly IUserRepository _users;
+    private readonly IRoleRepository _roles;
     private readonly ICurrentUser _currentUser;
     private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteUser(IUserRepository users, ICurrentUser currentUser, IUnitOfWork unitOfWork)
+    public DeleteUser(
+        IUserRepository users,
+        IRoleRepository roles,
+        ICurrentUser currentUser,
+        IUnitOfWork unitOfWork)
     {
         _users = users;
+        _roles = roles;
         _currentUser = currentUser;
         _unitOfWork = unitOfWork;
     }
@@ -27,10 +33,23 @@ public sealed class DeleteUser
         if (_currentUser.Id == id)
             return Result.Failure(Error.Conflict("Un usuario no puede eliminar su propia cuenta."));
 
-        if (user.Role == UserRole.Admin &&
-            await _users.CountByRoleAsync(UserRole.Admin, cancellationToken) <= 1)
+        // Igual que en el update: lo que se protege es que quede alguien capaz de
+        // administrar, no un nombre de rol concreto.
+        foreach (var permission in Permissions.Critical)
+        {
+            var others = await _roles.CountActiveUsersWithPermissionAsync(
+                permission, excludingRoleId: user.RoleId, cancellationToken);
+
+            if (others > 0)
+                continue;
+
+            var sameRole = await _users.CountActiveByRoleAsync(user.RoleId, cancellationToken);
+            if (sameRole > 1)
+                continue;
+
             return Result.Failure(Error.Conflict(
-                "No se puede eliminar al único administrador del sistema."));
+                $"Eliminar este usuario dejaría el sistema sin nadie con '{permission}'."));
+        }
 
         // Los movimientos referencian al usuario con FK restrictiva, así que se desactiva
         // en lugar de borrar cuando ya registró actividad.

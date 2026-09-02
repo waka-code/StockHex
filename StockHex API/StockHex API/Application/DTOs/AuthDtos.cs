@@ -22,4 +22,4 @@ public sealed record AuthResponse(
     DateTime ExpiresAt,
     string RefreshToken,
     DateTime RefreshTokenExpiresAt,
-    UserResponse User);
+    CurrentUserResponse User);

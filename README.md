@@ -7,8 +7,12 @@ autenticación JWT y autorización por roles.
 - **Interfaz web** en React + Vite + TypeScript → [`StockHex.Web/`](StockHex.Web/README.md)
 
 ```
-[██████████] MVP funcional  ·  131/131 tests de API  ·  verificado en navegador real
+[██████████] MVP funcional  ·  164/164 tests de API  ·  95 comprobaciones en navegador real
 ```
+
+> **Antes de implementar cualquier cosa, lee [`CLAUDE.md`](CLAUDE.md)**: son las
+> reglas del proyecto y la fuente de verdad. Incluye el estado de cumplimiento
+> declarado, con lo que hoy **no** cumple.
 
 ---
 
@@ -102,13 +106,18 @@ En `Development` se usa `appsettings.Development.json`, que ya trae valores loca
 ### Tests
 
 ```bash
-cd "StockHex API" && dotnet test     # 131 tests de la API
+cd "StockHex API" && dotnet test     # 164 tests de la API
 
 cd StockHex.Web
 npx playwright install chromium      # una vez
+npm run e2e                          # las 5 suites en navegador real
 npm run e2e:proxy                    # el despliegue: un origen, sin CORS, límites
-APP_URL=http://localhost:8080 npm run e2e   # recorrido en navegador real
 ```
+
+`npm run e2e` **espera entre suite y suite**: el limitador de `/api/auth` acepta 10
+intentos por minuto y una tanda completa hace más de 10 logins, así que encadenarlas
+sin pausa dejaba a las últimas sin poder entrar. Por eso la tanda tarda varios
+minutos; una suite suelta (`npm run e2e:filters`) es inmediata.
 
 ---
 
@@ -126,7 +135,8 @@ StockHex API/
 ├── Api/                          Controladores, middleware, mapeo Result → HTTP
 │   ├── Controllers/
 │   ├── Middleware/               Manejo global de excepciones → ProblemDetails
-│   └── Extensions/               CORS, Swagger+JWT, ResultExtensions, Roles
+│   └── Extensions/               CORS, Swagger+JWT, ResultExtensions,
+│                                 RequirePermission, rate limiting, forwarded headers
 ├── Application/                  Casos de uso, DTOs, validadores
 │   ├── UseCases/                 Un caso de uso = una clase
 │   ├── DTOs/                     Request/Response segregados
@@ -135,9 +145,9 @@ StockHex API/
 │   └── Abstractions/             IPasswordHasher, ITokenService, ICurrentUser
 ├── Domain/                       Sin dependencias externas
 │   ├── Entities/
-│   ├── Enums/                    UserRole, MovementType
+│   ├── Enums/                    MovementType
+│   ├── Authorization/            Permissions.cs — el catálogo, única fuente
 │   ├── Common/                   Result<T>, Error, PagedResult<T>, PageRequest
-│   ├── Exceptions/
 │   └── Interfaces/               Repositorios + IUnitOfWork
 └── Infrastructure/
     ├── Persistence/              DbContext, configuraciones EF, seeder
@@ -163,23 +173,70 @@ Todas las respuestas de error son **ProblemDetails (RFC 7807)** con
 |---|---|
 | Validación de entrada | `400` con detalle por campo |
 | Sin token o token inválido | `401` |
-| Rol insuficiente | `403` |
+| Permiso insuficiente | `403` |
 | Recurso inexistente | `404` |
 | Duplicado, stock insuficiente, borrado que rompe integridad | `409` |
 | Error inesperado | `500` con `traceId` (sin stack trace en producción) |
 
 ---
 
-## Roles
+## Roles y permisos
 
-| Rol | Permisos |
-|---|---|
-| `Admin` | Todo, incluida la gestión de usuarios |
-| `Manager` | Catálogo, clientes, proveedores, movimientos, reportes |
-| `Operator` | Consulta y registro de movimientos |
+Los **roles son datos**: se crean, editan y eliminan desde la interfaz. Los
+**permisos tienen una sola fuente**, el código: 31 claves en 9 módulos declaradas en
+`Domain/Authorization/Permissions.cs`. No hay tabla de permisos: un permiso se
+declara junto al código que lo hace valer, así que agregar uno es un cambio de
+código, igual que el endpoint que lo comprueba.
 
-El auto-registro (`POST /api/auth/register`) **siempre** crea `Operator`: el rol no
-se lee del body, así nadie puede registrarse como administrador.
+```
+dashboard.view    products.view      categories.view     users.view
+                  products.create    categories.create   users.create
+movements.view    products.edit      categories.edit     users.edit
+movements.create  products.delete    categories.delete   users.delete
+movements.reverse                                        users.change_password
+                  suppliers.view     clients.view
+reports.view      suppliers.create   clients.create      roles.view
+reports.export    suppliers.edit     clients.edit        roles.create
+                  suppliers.delete   clients.delete      roles.edit
+                                                         roles.delete
+```
+
+Nueve módulos: `dashboard`, `products`, `movements`, `reports`, `categories`,
+`suppliers`, `clients`, `users` y `roles`. Los tres permisos **especiales** —los que
+sólo tiene un módulo— son `movements.reverse`, `reports.export` y
+`users.change_password`.
+
+La migración inicial crea tres roles equivalentes al modelo anterior, y se pueden
+editar o complementar con los que haga falta:
+
+| Rol | Permisos | Notas |
+|---|---|---|
+| `Administrador` | 31 de 31 | Rol de **sistema**: no se elimina ni se queda sin los permisos críticos |
+| `Jefe de bodega` | 22 | Todo menos usuarios y roles |
+| `Bodeguero` | 5 | Dashboard, productos (ver), movimientos (ver y crear), reportes |
+
+Cada endpoint exige su permiso con `[RequirePermission("x.y")]` y responde `403` si
+falta. El frontend usa los mismos permisos para no ofrecer acciones que van a fallar,
+**nunca como control de acceso**.
+
+Dos claves del catálogo no cuelgan de un endpoint, y conviene saber por qué:
+
+- **`dashboard.view`** sólo habilita la pantalla de inicio. No hay un endpoint de
+  dashboard: la pantalla compone `/api/reports/*` y `/api/inventory-movements`, y
+  cada uno exige su propio permiso, así que la autorización real sigue en la API.
+- **`reports.export`** está declarada y concedida a dos roles, pero **hoy no la
+  comprueba nada**: el endpoint de exportación todavía no existe (ver
+  [Pendiente](#pendiente-post-mvp)). Es la única clave del catálogo sin uso.
+
+**Cuándo surte efecto un cambio de permisos.** El JWT lleva sólo el id del rol, no la
+lista de permisos: si la llevara, quitarle un permiso a alguien no surtiría efecto
+hasta que su token se renovara, hasta 60 minutos después. Se resuelven por petición
+con una caché de 30 segundos que se invalida al editar el rol, así que el cambio se
+aplica de inmediato y sin cerrar la sesión de nadie.
+
+El auto-registro (`POST /api/auth/register`) usa el rol configurado en
+`Auth:RegistrationRoleName` (por omisión `Bodeguero`). El rol nunca se lee del body,
+así nadie puede registrarse con permisos elevados.
 
 ---
 
@@ -190,12 +247,14 @@ se lee del body, así nadie puede registrarse como administrador.
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
 | POST | `/login` | público | Devuelve access token + refresh token + perfil |
-| POST | `/register` | público | Auto-registro como `Operator` |
+| POST | `/register` | público | Auto-registro con el rol de `Auth:RegistrationRoleName` (por omisión `Bodeguero`) |
 | POST | `/refresh` | público | Canjea el refresh token por un par nuevo |
 | POST | `/logout` | autenticado | Revoca el refresh token (`allSessions` cierra todas) |
-| GET | `/me` | autenticado | Perfil del portador del token |
+| GET | `/me` | autenticado | Perfil del portador del token, con sus permisos efectivos |
 
-**Sesiones.** El access token dura 60 minutos; el refresh token, 14 días. Cada canje
+**Sesiones.** El access token dura 60 minutos y el refresh token 14 días (en
+`Development` el access sube a 480 minutos para no renovar cada rato mientras se
+desarrolla). Cada canje
 **rota** el refresco: el usado queda revocado y se emite otro. Si aparece un token ya
 rotado se asume robo y se invalida la cadena completa de esa sesión. En la base sólo
 se guarda el SHA-256 del token, nunca el valor en claro.
@@ -214,12 +273,12 @@ caducados o revocados hace más de 30 días; sin eso la tabla crece indefinidame
 
 ### Movimientos de inventario — `/api/inventory-movements`
 
-| Método | Ruta | Rol | Descripción |
+| Método | Ruta | Permiso | Descripción |
 |---|---|---|---|
-| GET | `/` | autenticado | Historial paginado y filtrable |
-| GET | `/{id}` | autenticado | Un movimiento |
-| POST | `/` | autenticado | Registra movimiento y ajusta stock |
-| POST | `/{id}/reverse` | Admin, Manager | Corrige un movimiento registrando su inverso |
+| GET | `/` | `movements.view` | Historial paginado y filtrable |
+| GET | `/{id}` | `movements.view` | Un movimiento |
+| POST | `/` | `movements.create` | Registra movimiento y ajusta stock |
+| POST | `/{id}/reverse` | `movements.reverse` | Corrige un movimiento registrando su inverso |
 
 Filtros de `GET`: `productId`, `clientId`, `supplierId`, `userId`, `movementType`, `from`, `to`, `search`, `page`, `pageSize`.
 
@@ -251,13 +310,13 @@ conflictos, con el stock exactamente igual al número de movimientos registrados
 
 ### Productos — `/api/products`
 
-| Método | Ruta | Rol |
+| Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/` | autenticado |
-| GET | `/{id}` | autenticado |
-| POST | `/` | Admin, Manager |
-| PUT | `/{id}` | Admin, Manager |
-| DELETE | `/{id}` | Admin, Manager |
+| GET | `/` | `products.view` |
+| GET | `/{id}` | `products.view` |
+| POST | `/` | `products.create` |
+| PUT | `/{id}` | `products.edit` |
+| DELETE | `/{id}` | `products.delete` |
 
 Filtros: `categoryId`, `supplierId`, `isActive`, `lowStockOnly`, `search`, `page`, `pageSize`.
 
@@ -267,22 +326,50 @@ El producto se crea con **stock 0** y `PUT` **no** modifica el stock: para eso e
 ### Categorías, Proveedores, Clientes
 
 `/api/categories`, `/api/suppliers`, `/api/clients` — CRUD completo, mismo esquema:
-lectura para autenticados, escritura para `Admin` y `Manager`. No se puede eliminar
-una entidad que tenga registros dependientes (responde `409`).
+cada verbo exige el permiso de su módulo (`categories.view`, `categories.create`,
+`categories.edit`, `categories.delete`, y lo equivalente en los otros dos). No se
+puede eliminar una entidad que tenga registros dependientes (responde `409`).
 
 ### Usuarios — `/api/users`
 
-| Método | Ruta | Rol |
+| Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/` | Admin |
-| GET | `/{id}` | Admin |
-| POST | `/` | Admin |
-| PUT | `/{id}` | Admin |
-| DELETE | `/{id}` | Admin |
+| GET | `/` | `users.view` |
+| GET | `/{id}` | `users.view` |
+| POST | `/` | `users.create` |
+| PUT | `/{id}` | `users.edit` |
+| DELETE | `/{id}` | `users.delete` |
+| POST | `/{id}/reset-password` | `users.change_password` |
 | POST | `/me/change-password` | autenticado |
 
-Guardias: no se puede degradar ni desactivar al único administrador, ni eliminar la
-propia cuenta. Las respuestas **nunca** incluyen el hash de la contraseña.
+Filtros de `GET`: `roleId`, `isActive`, `search`, `page`, `pageSize`.
+
+`reset-password` cambia la contraseña de **otro** usuario: no pide la actual, porque
+quien la cambia no la conoce, y admite revocar sus sesiones para que tenga que entrar
+con la nueva. La propia contraseña se cambia en `me/change-password`, que sí exige la
+actual.
+
+Guardias: no se puede dejar el sistema **sin ningún usuario activo** con `roles.edit`
+y `users.edit`, ni eliminar la propia cuenta. Las respuestas **nunca** incluyen el
+hash de la contraseña.
+
+### Roles y permisos — `/api/roles` y `/api/permissions`
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/permissions` | autenticado |
+| GET | `/api/roles` | `roles.view` |
+| GET | `/api/roles/{id}` | `roles.view` |
+| POST | `/api/roles` | `roles.create` |
+| PUT | `/api/roles/{id}` | `roles.edit` |
+| DELETE | `/api/roles/{id}` | `roles.delete` |
+
+`GET /api/permissions` devuelve el catálogo completo agrupado por módulo. Es la única
+fuente: el frontend lo consume y no lo redeclara.
+
+`PUT` reemplaza el conjunto completo de permisos del rol; una clave que no esté en el
+catálogo se rechaza con `400`. Un rol de sistema no se elimina ni se queda sin los
+permisos críticos, y uno con usuarios asignados tampoco se elimina (`409`).
 
 ### Reportes — `/api/reports`
 
@@ -291,6 +378,21 @@ propia cuenta. Las respuestas **nunca** incluyen el hash de la contraseña.
 | `/inventory-summary` | Totales de productos, stock bajo y valorización |
 | `/low-stock` | Productos en o bajo su mínimo, paginado y ordenado por déficit |
 | `/movement-summary?from=&to=` | Actividad por tipo de movimiento (30 días por defecto) |
+
+### Paginación
+
+Todos los `GET` de listado aceptan `page`, `pageSize` y `search`, y **resuelven el
+filtrado, la búsqueda y la paginación en SQL**: nunca devuelven el conjunto completo
+para que el cliente lo recorte.
+
+Los tamaños que la interfaz ofrece son **10, 15 y 25**, con **15** por omisión.
+Están definidos una sola vez, en `PageRequest.AllowedPageSizes`
+(`Domain/Common/PageRequest.cs`). Aparte de eso, `MaxPageSize = 100` es un techo
+duro que acota cualquier petición para que nadie pueda pedir un listado ilimitado
+escribiendo la URL.
+
+La respuesta es un `PagedResponse<T>` con `items`, `page`, `pageSize`, `totalCount`,
+`totalPages`, `hasPrevious` y `hasNext`.
 
 ### Salud
 
@@ -305,8 +407,9 @@ propia cuenta. Las respuestas **nunca** incluyen el hash de la contraseña.
 
 ```
 Category ─┬─< Product >─┬─ Supplier
-          │             │           │
-          │             └─< InventoryMovement >─┬─ User ─< RefreshToken
+          │             │
+          │             └─< InventoryMovement >─┬─ User >─ Role ─< RolePermission
+          │                                     │         └─< RefreshToken
           │                                     ├─ Client
           │                                     └─ (auto-referencia: reversión)
 ```
@@ -317,7 +420,9 @@ Category ─┬─< Product >─┬─ Supplier
 | `Supplier` | Id, Name*, Description, PhoneNumber, Email, CreatedAt, UpdatedAt |
 | `Client` | Id, Name, Address, PhoneNumber, Email*, CreatedAt, UpdatedAt |
 | `Product` | Id, Name, Description, Sku*, Price, StockQuantity, MinimumStock, IsActive, CategoryId, SupplierId, RowVersion, CreatedAt, UpdatedAt |
-| `User` | Id, Name, Email*, PasswordHash, Role, IsActive, EmailConfirmed, CreatedAt, UpdatedAt, LastLoginAt |
+| `User` | Id, Name, Email*, PasswordHash, RoleId, IsActive, EmailConfirmed, CreatedAt, UpdatedAt, LastLoginAt |
+| `Role` | Id, Name*, Description, IsSystem, CreatedAt, UpdatedAt |
+| `RolePermission` | Id, RoleId, Permission (clave del catálogo; único por rol) |
 | `InventoryMovement` | Id, MovementType, ProductId, Quantity, UnitPrice, StockBefore, StockAfter, MovementDate, UserId, ClientId, SupplierId, ReversalOfMovementId, Comment |
 | `RefreshToken` | Id, TokenHash*, UserId, ExpiresAt, CreatedAt, RevokedAt, RevokedReason, ReplacedByTokenId |
 
@@ -333,10 +438,14 @@ nunca desaparece por un borrado en cascada.
 `Product.RowVersion` es un token de concurrencia: dos movimientos simultáneos sobre
 el mismo producto no pueden pisarse el stock, el segundo recibe `409`.
 
-`InventoryMovement.ReversalOfMovementId` tiene un índice único filtrado: la base
-garantiza que un movimiento no pueda revertirse dos veces, no sólo la comprobación
-previa del caso de uso. `RefreshToken` es la única relación en cascada del modelo:
-los tokens de un usuario borrado no son auditoría.
+`InventoryMovement.ReversalOfMovementId` tiene un índice único filtrado
+(`WHERE [ReversalOfMovementId] IS NOT NULL`): la base garantiza que un movimiento no
+pueda revertirse dos veces, no sólo la comprobación previa del caso de uso.
+
+Las **dos únicas relaciones en cascada** son `User → RefreshToken` y
+`Role → RolePermission`: ni los tokens de un usuario borrado ni los permisos de un rol
+borrado son auditoría. Todo lo demás es `Restrict`, salvo `Product.SupplierId`, que es
+`SetNull` para que dar de baja a un proveedor no arrastre sus productos.
 
 ---
 
@@ -354,17 +463,17 @@ Toda clave se puede pasar por variable de entorno usando `__` como separador
 | `Jwt:RefreshTokenDays` | no | Vigencia del refresh token (por defecto 14) |
 | `RateLimiting:AuthPermitLimit` | no | Peticiones a `/api/auth` por ventana (por defecto 10) |
 | `RateLimiting:AuthWindowSeconds` | no | Duración de la ventana en segundos (por defecto 60) |
-| `ForwardedHeaders:Enabled` | no | Confiar en `X-Forwarded-For` (por defecto `false`) |
+| `ForwardedHeaders:Enabled` | no | Confiar en `X-Forwarded-For` (por defecto `false`; el compose lo activa para nginx) |
 | `ForwardedHeaders:KnownProxies` | no | IPs de los proxies de confianza |
 | `ForwardedHeaders:KnownNetworks` | no | Redes de confianza en CIDR, p. ej. `10.0.0.0/8` |
 | `RefreshTokenCleanup:IntervalHours` | no | Frecuencia de la purga de tokens (por defecto 24) |
 | `RefreshTokenCleanup:RetentionDays` | no | Margen antes de borrar un token (por defecto 30) |
 | `Cors:AllowedOrigins` | no | Orígenes permitidos, arreglo o lista separada por `;`; vacío = cualquiera sin credenciales |
 | `Swagger:Enabled` | no | Exponer Swagger UI (por defecto: sólo en `Development`) |
-| `ForwardedHeaders:Enabled` | no | Confiar en `X-Forwarded-For` (el compose lo activa para nginx) |
 | `Database:MigrateOnStartup` | no | Aplicar migraciones al arrancar (por defecto `true`) |
 | `Database:MigrationTimeoutSeconds` | no | Límite de espera por la base (por defecto 60) |
-| `Seed:AdminEmail` / `Seed:AdminPassword` | no | Administrador inicial, sólo si no existe ninguno |
+| `Seed:AdminEmail` / `Seed:AdminPassword` | no | Administrador inicial, sólo si no hay nadie con permiso para administrar roles |
+| `Auth:RegistrationRoleName` | no | Rol del auto-registro público (por defecto `Bodeguero`) |
 
 `Jwt:Key` se valida al arrancar: si falta o es corta, la aplicación **no levanta**
 en lugar de emitir tokens inseguros.
@@ -393,7 +502,7 @@ Se aplican automáticamente al arrancar salvo que se ponga `Database:MigrateOnSt
 
 ## Tests
 
-121 tests, todos en verde.
+164 tests, todos en verde.
 
 | Suite | Cubre |
 |---|---|
@@ -408,9 +517,13 @@ Se aplican automáticamente al arrancar salvo que se ponga `Database:MigrateOnSt
 | `UseCases/DeleteEntityGuardTests` | Borrados que romperían integridad o perderían auditoría |
 | `UseCases/LoginTests` | Credenciales, cuenta inactiva, no filtrar qué emails existen |
 | `UseCases/UserGuardTests` | Último administrador, auto-eliminación, cambio de contraseña |
+| `UseCases/ResetPasswordTests` | Restablecer la contraseña de otro usuario y revocar sus sesiones |
+| `UseCases/RoleCrudTests` | Crear, editar y borrar roles; rol de sistema; rol con usuarios; permisos críticos |
+| `UseCases/CorsOriginsTests` | Lectura de orígenes: arreglo, lista con `;`, barra final, duplicados |
+| `Authorization/PermissionCatalogTests` | El catálogo: claves únicas, módulos, permisos críticos, normalización |
 | `Security/PasswordHasherTests` | Roundtrip BCrypt, salt por hash, hashes corruptos |
 | `Security/TokenServiceTests` | Claims del JWT, `ClaimTypes.Role`, `jti` único |
-| `Common/PageRequestTests` | Acotado de paginación, `Result<T>` |
+| `Common/PageRequestTests` | Acotado de paginación, tamaños ofrecidos y su defecto, `Result<T>` |
 | `Integration/ApiEndpointsTests` | Pipeline HTTP completo: auth, roles, validación, flujo de inventario |
 | `Integration/AuthLifecycleTests` | Login, refresh, reutilización, logout y reversión por HTTP |
 | `Integration/RateLimitingTests` | 429 al superar el límite, `Retry-After`, alcance de la política |
@@ -443,6 +556,17 @@ los contenedores hablan HTTP en la red interna.
 
 ## Pendiente (post-MVP)
 
+Lo que exigen las reglas del proyecto y todavía no está, en
+[`CLAUDE.md`](CLAUDE.md#trabajo-pendiente-que-derivan-estas-reglas):
+
+- **Selectores con búsqueda en el servidor** (hoy descargan un lote fijo de 100)
+- **KPIs de Movimientos agregados en la API** (hoy se calculan sobre la página cargada)
+
+Y el resto:
+
+- **Exportación de reportes** — `reports.export` ya existe en el catálogo y está
+  concedida a dos roles, pero no hay endpoint que la exija. Al implementarla hay que
+  exigir **esa** clave, no declarar una nueva
 - HTTPS/TLS delante del contenedor
 - Confirmación de email y recuperación de contraseña (`EmailConfirmed` existe pero no hay flujo)
 - Logs persistentes: Serilog sólo escribe a consola

@@ -12,10 +12,10 @@ public sealed class GetUsers
     public GetUsers(IUserRepository users) => _users = users;
 
     public async Task<Result<PagedResponse<UserResponse>>> RunAsync(
-        PageRequest request,
+        UserFilter filter,
         CancellationToken cancellationToken = default)
     {
-        var page = await _users.GetPagedAsync(request, cancellationToken);
+        var page = await _users.GetPagedAsync(filter, cancellationToken);
         return PagedResponse<UserResponse>.From(page, u => u.ToResponse());
     }
 }

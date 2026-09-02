@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockHex_API.Api.Extensions;
+using StockHex_API.Domain.Authorization;
 using StockHex_API.Application.DTOs;
 using StockHex_API.Application.UseCases.InventoryMovementUseCases;
 using StockHex_API.Domain.Common;
@@ -13,6 +14,7 @@ namespace StockHex_API.Api.Controllers;
 [ApiController]
 [Route("api/inventory-movements")]
 [Authorize]
+[RequirePermission(Permissions.Movements.View)]
 public sealed class InventoryMovementsController : ControllerBase
 {
     private readonly CreateMovement _create;
@@ -55,6 +57,7 @@ public sealed class InventoryMovementsController : ControllerBase
     /// el stock al valor indicado en Quantity. El autor se toma del token.
     /// </summary>
     [HttpPost]
+    [RequirePermission(Permissions.Movements.Create)]
     [ProducesResponseType(typeof(MovementResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -71,7 +74,7 @@ public sealed class InventoryMovementsController : ControllerBase
     /// Sólo se puede revertir una vez, y no se puede revertir una reversión.
     /// </summary>
     [HttpPost("{id:guid}/reverse")]
-    [Authorize(Roles = Roles.AdminOrManager)]
+    [RequirePermission(Permissions.Movements.Reverse)]
     [ProducesResponseType(typeof(MovementResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

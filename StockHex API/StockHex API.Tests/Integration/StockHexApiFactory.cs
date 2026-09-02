@@ -5,8 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StockHex_API.Application.Abstractions;
+using StockHex_API.Domain.Authorization;
 using StockHex_API.Domain.Entities;
-using StockHex_API.Domain.Enums;
 using StockHex_API.Infrastructure.Persistence;
 
 namespace StockHex_API.Tests.Integration;
@@ -72,7 +72,11 @@ public class StockHexApiFactory : WebApplicationFactory<Program>
         });
     }
 
-    /// <summary>Crea un administrador y un operador para poder autenticarse en los tests.</summary>
+    /// <summary>
+    /// Siembra los roles y los usuarios de prueba. La migración que los crea no
+    /// corre sobre InMemory, así que aquí se replica lo mínimo: un rol con el
+    /// catálogo completo y otro de menor privilegio.
+    /// </summary>
     public async Task SeedUsersAsync()
     {
         using var scope = Services.CreateScope();
@@ -82,23 +86,60 @@ public class StockHexApiFactory : WebApplicationFactory<Program>
         if (await context.Users.AnyAsync())
             return;
 
+        var adminRole = new Role
+        {
+            Name = "Administrador",
+            Description = "Acceso total al sistema",
+            IsSystem = true,
+        };
+        foreach (var key in Permissions.All)
+            adminRole.Permissions.Add(new RolePermission { RoleId = adminRole.Id, Permission = key });
+
+        var operatorRole = new Role
+        {
+            Name = "Bodeguero",
+            Description = "Registra movimientos y consulta el catálogo",
+            IsSystem = false,
+        };
+        foreach (var key in new[]
+                 {
+                     Permissions.Dashboard.View,
+                     Permissions.Products.View,
+                     Permissions.Movements.View,
+                     Permissions.Movements.Create,
+                     Permissions.Reports.View,
+                 })
+        {
+            operatorRole.Permissions.Add(new RolePermission { RoleId = operatorRole.Id, Permission = key });
+        }
+
+        context.Roles.AddRange(adminRole, operatorRole);
+
         context.Users.AddRange(
             new User
             {
                 Name = "Admin",
                 Email = AdminEmail,
                 PasswordHash = hasher.Hash(AdminPassword),
-                Role = UserRole.Admin
+                RoleId = adminRole.Id,
             },
             new User
             {
                 Name = "Operador",
                 Email = OperatorEmail,
                 PasswordHash = hasher.Hash(OperatorPassword),
-                Role = UserRole.Operator
+                RoleId = operatorRole.Id,
             });
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>Id del rol de menor privilegio, para las pruebas que asignan roles.</summary>
+    public async Task<Guid> GetOperatorRoleIdAsync()
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await context.Roles.Where(r => !r.IsSystem).Select(r => r.Id).FirstAsync();
     }
 
     public async Task<ApplicationDbContext> CreateContextAsync()

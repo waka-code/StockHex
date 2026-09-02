@@ -1,46 +1,37 @@
-import type { UserRole } from '../api/types';
+import type { PermissionKey } from '../api/types';
+import { P } from './permissions';
 
-/** Secciones del menú y qué roles las ven. Espeja la autorización de la API. */
+/**
+ * Secciones del menú. Cada una declara el permiso que la habilita, no una lista
+ * de roles: con roles configurables, un rol nuevo aparece en el menú correcto sin
+ * tocar este archivo.
+ */
 export interface NavItem {
   label: string;
   path: string;
   icon: string;
-  roles: readonly UserRole[];
+  permission: PermissionKey;
 }
-
-const ALL: readonly UserRole[] = ['Admin', 'Manager', 'Operator'];
-const MANAGE: readonly UserRole[] = ['Admin', 'Manager'];
-const ADMIN: readonly UserRole[] = ['Admin'];
 
 /** El orden es el de uso diario, no el alfabético. */
 export const NAV: readonly NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: 'grid', roles: ALL },
-  { label: 'Productos', path: '/productos', icon: 'box', roles: ALL },
-  { label: 'Movimientos', path: '/movimientos', icon: 'swap', roles: ALL },
-  { label: 'Reportes', path: '/reportes', icon: 'chart', roles: ALL },
-  { label: 'Categorías', path: '/categorias', icon: 'tag', roles: MANAGE },
-  { label: 'Proveedores', path: '/proveedores', icon: 'truck', roles: MANAGE },
-  { label: 'Clientes', path: '/clientes', icon: 'users', roles: MANAGE },
-  { label: 'Usuarios', path: '/usuarios', icon: 'shield', roles: ADMIN },
+  { label: 'Dashboard', path: '/', icon: 'grid', permission: P.dashboard.view },
+  { label: 'Productos', path: '/productos', icon: 'box', permission: P.products.view },
+  { label: 'Movimientos', path: '/movimientos', icon: 'swap', permission: P.movements.view },
+  { label: 'Reportes', path: '/reportes', icon: 'chart', permission: P.reports.view },
+  { label: 'Categorías', path: '/categorias', icon: 'tag', permission: P.categories.view },
+  { label: 'Proveedores', path: '/proveedores', icon: 'truck', permission: P.suppliers.view },
+  { label: 'Clientes', path: '/clientes', icon: 'users', permission: P.clients.view },
+  { label: 'Usuarios', path: '/usuarios', icon: 'shield', permission: P.users.view },
+  { label: 'Roles', path: '/roles', icon: 'lock', permission: P.roles.view },
 ];
 
-export function navFor(role: UserRole): NavItem[] {
-  return NAV.filter((item) => item.roles.includes(role));
+/** Secciones visibles con el conjunto de permisos indicado. */
+export function navFor(permissions: ReadonlySet<PermissionKey>): NavItem[] {
+  return NAV.filter((item) => permissions.has(item.permission));
 }
 
-/**
- * Permisos de escritura. Es un espejo de lo que impone la API, no la
- * autorización real: sirve para no ofrecer botones que van a dar 403.
- */
-export const can = {
-  manageCatalog: (role: UserRole) => role === 'Admin' || role === 'Manager',
-  manageUsers: (role: UserRole) => role === 'Admin',
-  reverseMovements: (role: UserRole) => role === 'Admin' || role === 'Manager',
-  createMovements: (_role: UserRole) => true,
-};
-
-export const ROLE_LABEL: Record<UserRole, string> = {
-  Admin: 'Admin',
-  Manager: 'Manager',
-  Operator: 'Operator',
-};
+/** Primera ruta a la que se puede entrar. Sirve para redirigir tras un 403. */
+export function firstAllowedPath(permissions: ReadonlySet<PermissionKey>): string {
+  return navFor(permissions)[0]?.path ?? '/sin-acceso';
+}

@@ -1,6 +1,6 @@
 # Estado del MVP
 
-Actualizado: 2 de septiembre de 2026 (cuarta tanda · frontend)
+Actualizado: 2 de septiembre de 2026 (sexta tanda · reglas del proyecto)
 
 ## Checklist original — completo
 
@@ -23,15 +23,17 @@ Actualizado: 2 de septiembre de 2026 (cuarta tanda · frontend)
       y AutoMapper pasó a licencia comercial desde la v15.
 - [x] Serilog — logging estructurado a consola, configurable por `appsettings`.
 - [x] Middleware de error global — `ExceptionHandlingMiddleware` → ProblemDetails (RFC 7807).
-- [x] Tests unitarios — 131 tests en verde, muy por encima del 20% pedido.
+- [x] Tests unitarios — 164 tests en verde, muy por encima del 20% pedido.
 
 **Mediano plazo**
-- [x] Autenticación / autorización JWT — `POST /api/auth/login`, BCrypt (work factor 12),
-      3 roles con `[Authorize(Roles = ...)]`.
-- [x] Paginación en todos los Get — `PageRequest` con `pageSize` acotado a 100.
+- [x] Autenticación / autorización JWT — `POST /api/auth/login`, BCrypt (work factor 12).
+      Los 3 roles fijos con `[Authorize(Roles = ...)]` fueron **reemplazados** en la
+      quinta tanda por permisos: los roles pasaron a ser datos editables.
+- [x] Paginación en todos los Get — `PageRequest`, con techo duro de 100 y tamaño
+      elegible por el usuario (10/15/25) desde la sexta tanda.
 - [x] Tests de integración — `WebApplicationFactory` levanta la API real.
+- [x] CI/CD pipeline — `.github/workflows/ci.yml`, desde la segunda tanda.
 - [ ] Caching (Redis o memoria) — pendiente, ver abajo.
-- [ ] CI/CD pipeline — pendiente, ver abajo.
 
 ## Añadido fuera del checklist
 
@@ -152,17 +154,19 @@ implementado en **React 19 + Vite + TypeScript** en `StockHex.Web/`.
 
 - [x] **Las 11 pantallas del diseño**: login, dashboard, productos, detalle de
       producto, registro de movimiento, historial con reversión, categorías,
-      proveedores, clientes, usuarios y reportes.
+      proveedores, clientes, usuarios y reportes. La quinta tanda sumó dos más:
+      roles y editor de permisos.
 - [x] **Renovación de sesión transparente** con una sola renovación en vuelo. Sin
       eso, varias peticiones con 401 simultáneo canjearían el mismo refresh token
       y la API lo interpretaría como robo, cortando la sesión completa.
-- [x] **Roles reflejados en la interfaz**: 8 / 7 / 4 secciones según Admin, Manager
-      u Operator, con las rutas escritas a mano bloqueadas por una guarda.
+- [x] **Roles reflejados en la interfaz**, con las rutas escritas a mano bloqueadas
+      por una guarda. Los tres roles fijos de esta tanda desaparecieron en la
+      quinta: el menú pasó a derivarse de permisos.
 - [x] **Errores por campo**: los `ProblemDetails` de la API se traducen y el mensaje
       del validador aparece junto al campo que lo causó, no en un cartel genérico.
 - [x] **Tema claro y oscuro** con variables CSS; ningún componente conoce un color
       literal.
-- [x] **Suite E2E en navegador real** (Playwright): 21 pasos de recorrido, los tres
+- [x] **Suite E2E en navegador real** (Playwright): 22 pasos de recorrido, los tres
       roles y cuatro escenarios de renovación de sesión.
 - [x] **CI** amplía a tres jobs: API, web y build de las dos imágenes.
 - [x] **Todo con un solo comando.** `docker compose up -d --build` en la raíz
@@ -190,7 +194,95 @@ que el puerto de Vite (5173) quedaba fuera y el navegador bloqueaba todo. Ahora
 la barra final (el header `Origin` nunca la envía) y se ignoran duplicados. Con
 tests.
 
+## Quinta tanda: RBAC y las reglas del proyecto
+
+El equipo fijó ocho reglas y pidió que vivieran en un archivo que se lee antes de
+implementar nada: [`CLAUDE.md`](CLAUDE.md). Con eso el modelo de autorización cambió
+de raíz.
+
+- [x] **Los roles son datos.** Tablas `Roles` y `RolePermissions`, CRUD completo,
+      y `enum UserRole` eliminado del proyecto. La migración es **escrita a mano**:
+      la que generó EF borraba la columna `Role` antes de crear nada y dejaba a
+      todos los usuarios con `Guid.Empty`. La escrita crea las tablas, siembra los
+      tres roles, hace el backfill con un `CASE` sobre la columna vieja y sólo
+      entonces la borra. Verificado en SQL Server: nadie perdió acceso.
+- [x] **Los permisos tienen una sola fuente, y es el código.** 31 claves en 9
+      módulos en `Domain/Authorization/Permissions.cs`. **No hay tabla de permisos**,
+      porque un permiso existe únicamente si un endpoint lo comprueba. Se exponen en
+      `GET /api/permissions` y el frontend los consume sin redeclararlos.
+- [x] **31 `[RequirePermission]`** y cero `[Authorize(Roles = …)]`. La interfaz usa
+      los mismos permisos para no ofrecer acciones que van a fallar, nunca como
+      control de acceso.
+- [x] **Un cambio de permisos se aplica en segundos, sin cerrar sesiones.** El JWT
+      lleva sólo el id del rol; si llevara la lista, quitar un permiso no surtiría
+      efecto hasta que el token se renovara, hasta 60 minutos después. Se resuelven
+      por petición con una caché de 30 s que se invalida al editar el rol.
+- [x] **Restablecer la contraseña de otro usuario** con el permiso
+      `users.change_password`, y opción de revocar sus sesiones.
+- [x] **Editor de permisos**: matriz de 9 módulos × 4 acciones más una columna de
+      especiales. Marcar Crear arrastra Ver; quitar Ver limpia el módulo.
+
+### Un guardia que desapareció al hacerlo bien
+
+`activeAdmins` contaba los administradores **de la página cargada** para decidir si
+deshabilitaba el botón de eliminar: con más de una página el número era falso. Con
+el RBAC dejó de existir en el frontend — el guardia lo impone la API comprobando que
+quede al menos un usuario activo con `roles.edit` y `users.edit`.
+
+### Dos bugs de EF que costó ver
+
+`_context.Roles.Update(role)` marcaba **todo el grafo** como modificado, incluidos
+los `RolePermission` que no habían cambiado, y saltaba `DbUpdateConcurrencyException`.
+Los siete repositorios que exponen `Update` pasaron a comprobar el estado de la
+entidad antes de llamarlo (el de movimientos no lo tiene: un movimiento nunca se
+modifica, se corrige con su inverso).
+
+Y un `RolePermission` nuevo se guardaba como *Modified* en vez de *Added*, porque su
+`Id` se asignaba en el inicializador y EF lo tomaba por una entidad existente. Se vio
+volcando el change tracker. Se corrigió con un `Add` explícito.
+
+## Sexta tanda: filtros en la URL y paginación elegible
+
+- [x] **Los filtros viven en la URL** (regla 4). Un único hook,
+      `lib/urlFilters.ts`, y las 9 pantallas con tabla migradas a él: no queda un
+      solo `useState` espejo de la URL. Refrescar conserva la consulta y copiar el
+      enlace reconstruye la pantalla. El hook **consolidó y borró** `useDebounced` y
+      `useResetPageOnFilterChange` en vez de convivir con ellos.
+- [x] **El usuario elige cuántas filas ve**: 10, 15 o 25, con 15 por omisión. Los
+      valores están definidos una sola vez, en `PageRequest.AllowedPageSizes`, y el
+      frontend los refleja. El selector lo pinta `Pager`, así que se agregó a las 9
+      tablas de una vez. El E2E no mira sólo la URL: **observa la petición** y
+      confirma que sale con el `pageSize` elegido.
+- [x] **`strict: true` declarado** en `tsconfig.app.json`. La auditoría anterior daba
+      por hecho que TypeScript lo activaba por defecto: es falso, sin declararlo
+      `noImplicitAny` está apagado. Al activarlo el proyecto compiló limpio.
+
+### Tres fallos del propio andamiaje
+
+- El contenedor `web` llevaba horas `unhealthy` con el sitio funcionando perfecto:
+  dentro del contenedor `localhost` resuelve primero a `::1` y nginx sólo escucha en
+  IPv4, así que la sonda daba «connection refused». Ahora usa `127.0.0.1`.
+- `npm run e2e` **no podía terminar en verde nunca**: el propio paso de credenciales
+  incorrectas provoca un 401 y el harness lo contaba como error, cortando la cadena
+  antes de las otras suites. Y una tanda completa se pasaba del límite de 10 logins
+  por minuto, con un timeout que parecía un fallo del producto. `e2e/run.mjs` espacia
+  las suites.
+- Tres suites apuntaban al servidor de Vite y tres al contenedor: una tanda «en
+  verde» no verificaba un despliegue, sino dos a medias. El destino ahora es único.
+
 ## Pendiente (post-MVP)
+
+Lo único que exigen las reglas y todavía no está son los dos puntos de la regla 3:
+
+- **Selectores con búsqueda en el servidor** — 11 consultas con `pageSize: 100`
+  alimentan `<select>` que filtran en memoria. Pasados los 100 registros, las
+  opciones que faltan son invisibles.
+- **KPIs de Movimientos agregados en la API** — hoy se suman sobre la página cargada.
+  Están rotulados «en la página», así que no engañan, pero la agregación le
+  corresponde a la base.
+
+Y el resto, que nunca fue del MVP:
+
 - **Confirmación de email y recuperación de contraseña** — `EmailConfirmed` existe
   pero sólo lo pone el seeder; no hay flujo.
 - **Logs persistentes** — Serilog sólo escribe a consola.

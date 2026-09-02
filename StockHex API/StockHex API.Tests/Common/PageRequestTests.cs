@@ -33,6 +33,27 @@ public sealed class PageRequestTests
     {
         new PageRequest { Page = 3, PageSize = 20 }.Skip.Should().Be(40);
     }
+
+    /// <summary>
+    /// El defecto tiene que ser uno de los tamaños que la interfaz ofrece: si no,
+    /// una pantalla recién abierta mostraría un número de filas que el selector
+    /// no puede volver a elegir.
+    /// </summary>
+    [Fact]
+    public void El_tamano_por_defecto_es_uno_de_los_ofrecidos()
+    {
+        PageRequest.AllowedPageSizes.Should().Contain(PageRequest.DefaultPageSize);
+    }
+
+    [Fact]
+    public void Los_tamanos_ofrecidos_estan_dentro_del_techo_y_son_crecientes()
+    {
+        PageRequest.AllowedPageSizes.Should()
+            .OnlyContain(size => size >= 1 && size <= PageRequest.MaxPageSize)
+            .And.BeInAscendingOrder()
+            .And.OnlyHaveUniqueItems()
+            .And.NotBeEmpty();
+    }
 }
 
 public sealed class PagedResultTests

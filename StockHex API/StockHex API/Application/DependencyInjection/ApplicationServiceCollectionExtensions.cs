@@ -5,6 +5,7 @@ using StockHex_API.Application.UseCases.ClientUseCases;
 using StockHex_API.Application.UseCases.InventoryMovementUseCases;
 using StockHex_API.Application.UseCases.ProductUseCases;
 using StockHex_API.Application.UseCases.ReportUseCases;
+using StockHex_API.Application.UseCases.RoleUseCases;
 using StockHex_API.Application.UseCases.SupplierUseCases;
 using StockHex_API.Application.UseCases.UserUseCases;
 
@@ -62,6 +63,15 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<GetUserById>();
         services.AddScoped<GetUsers>();
         services.AddScoped<ChangePassword>();
+        services.AddScoped<ResetUserPassword>();
+
+        // Roles y permisos
+        services.AddScoped<GetPermissionCatalog>();
+        services.AddScoped<GetRoles>();
+        services.AddScoped<GetRoleById>();
+        services.AddScoped<CreateRole>();
+        services.AddScoped<UpdateRole>();
+        services.AddScoped<DeleteRole>();
 
         // Inventory movements
         services.AddScoped<CreateMovement>();

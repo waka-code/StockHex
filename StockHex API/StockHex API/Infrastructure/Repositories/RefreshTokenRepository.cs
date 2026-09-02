@@ -56,7 +56,17 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     public async Task AddAsync(RefreshToken token, CancellationToken cancellationToken = default) =>
         await _context.RefreshTokens.AddAsync(token, cancellationToken);
 
-    public void Update(RefreshToken token) => _context.RefreshTokens.Update(token);
+    /// <summary>
+    /// Con la entidad ya rastreada no hace falta hacer nada: el tracker detecta los
+    /// cambios solo. Llamar a Update() marcaría todo el grafo como Modified,
+    /// incluidos los hijos recién añadidos, y EF intentaría un UPDATE de filas que
+    /// todavía no existen. Sólo una entidad desprendida necesita adjuntarse.
+    /// </summary>
+    public void Update(RefreshToken token)
+    {
+        if (_context.Entry(token).State == EntityState.Detached)
+            _context.RefreshTokens.Update(token);
+    }
 
     public async Task<int> DeleteExpiredAsync(
         DateTime olderThan,

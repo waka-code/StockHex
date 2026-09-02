@@ -6,15 +6,18 @@ import type {
   CreateProductRequest, ProductResponse, UpdateProductRequest,
 } from '../api/types';
 import { ApiError } from '../api/problem';
-import { useCurrentUser } from '../auth/useAuth';
-import { can } from '../auth/roles';
+import { useAuth } from '../auth/useAuth';
+import { P } from '../auth/permissions';
 import { DataTable, Pager, type Column } from '../components/DataTable';
 import { Field, FilterBar, Input, SearchInput, Select, TextArea, Toggle } from '../components/Field';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { useToast } from '../components/useToast';
 import { Button, Card, Chip, EmptyState, IconButton, Note } from '../components/ui';
 import { clp } from '../lib/format';
-import { useDebounced, usePageMeta, useResetPageOnFilterChange } from '../lib/hooks';
+import { usePageMeta } from '../lib/hooks';
+import {
+  boolParam, enumParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
+} from '../lib/urlFilters';
 
 const FORM_ID = 'product-form';
 
@@ -183,34 +186,46 @@ function ProductModal({
 }
 
 export function Products() {
-  const user = useCurrentUser();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const writable = can.manageCatalog(user.role);
+  const { can } = useAuth();
 
-  const [page, setPage] = useState(1);
-  const [searchInput, setSearchInput] = useState('');
-  const search = useDebounced(searchInput);
-  const [categoryId, setCategoryId] = useState('');
-  const [supplierId, setSupplierId] = useState('');
-  const [status, setStatus] = useState('active');
-  const [lowStockOnly, setLowStockOnly] = useState(false);
+  // Un permiso por acción: un rol puede crear productos y no poder borrarlos.
+  const canCreate = can(P.products.create);
+  const canEdit = can(P.products.edit);
+  const canDelete = can(P.products.delete);
+  const writable = canEdit || canDelete;
+
+  // Los filtros viven en la URL (regla 4): refrescar los conserva y el enlace
+  // reconstruye la pantalla para quien tenga permiso.
+  const filters = useUrlFilters({
+    page: numberParam(1, { min: 1, pagination: true }),
+    pageSize: pageSizeParam(),
+    search: stringParam(),
+    categoryId: stringParam(),
+    supplierId: stringParam(),
+    status: enumParam(['active', 'inactive', 'all'] as const, 'active'),
+    lowStockOnly: boolParam(),
+  });
+  const { page, pageSize, search, categoryId, supplierId, status, lowStockOnly } = filters.values;
+
+  // El texto que se escribe es estado de la UI; se confirma a la URL con retardo
+  // para no llenar el historial ni consultar en cada tecla.
+  const [searchInput, setSearchInput] = useDebouncedParam(
+    search, (value) => filters.set('search', value));
 
   const [editing, setEditing] = useState<ProductResponse | null>(null);
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ProductResponse | null>(null);
 
-  const filterKey = `${search}|${categoryId}|${supplierId}|${status}|${lowStockOnly}`;
-  useResetPageOnFilterChange(filterKey, page, setPage);
-
   const query = useMemo(() => ({
-    page, pageSize: 20,
+    page, pageSize,
     search: search || undefined,
     categoryId: categoryId || undefined,
     supplierId: supplierId || undefined,
     isActive: status === 'all' ? undefined : status === 'active',
     lowStockOnly: lowStockOnly || undefined,
-  }), [page, search, categoryId, supplierId, status, lowStockOnly]);
+  }), [page, pageSize, search, categoryId, supplierId, status, lowStockOnly]);
 
   const list = useQuery({
     queryKey: ['products', query],
@@ -248,10 +263,10 @@ export function Products() {
     subtitle: list.data
       ? `${list.data.totalCount} ${list.data.totalCount === 1 ? 'producto' : 'productos'}`
       : undefined,
-    actions: writable
+    actions: canCreate
       ? <Button kind="primary" icon="plus" onClick={() => setCreating(true)}>Nuevo producto</Button>
       : undefined,
-  }, [list.data?.totalCount, writable]);
+  }, [list.data?.totalCount, canCreate]);
 
   const columns: Column<ProductResponse>[] = [
     {
@@ -304,14 +319,17 @@ export function Products() {
       key: 'actions', header: '', align: 'right' as const, width: 70,
       render: (row: ProductResponse) => (
         <span style={{ display: 'inline-flex', gap: 2 }}>
-          <IconButton icon="pencil" title="Editar" onClick={() => setEditing(row)} />
-          <IconButton icon="trash" title="Eliminar" tone="dang" onClick={() => setRemoving(row)} />
+          {canEdit
+            ? <IconButton icon="pencil" title="Editar" onClick={() => setEditing(row)} />
+            : null}
+          {canDelete
+            ? <IconButton icon="trash" title="Eliminar" tone="dang" onClick={() => setRemoving(row)} />
+            : null}
         </span>
       ),
     }] : []),
   ];
 
-  const filtered = Boolean(search || categoryId || supplierId || lowStockOnly || status !== 'active');
 
   return (
     <>
@@ -326,22 +344,28 @@ export function Products() {
             placeholder="Buscar por nombre o SKU…" width={250} />}
         >
           <Field label="Categoría" width={150}>
-            <Select value={categoryId} onChange={setCategoryId} placeholder="Todas"
+            <Select value={categoryId} onChange={(v) => filters.set('categoryId', v)}
+              placeholder="Todas"
               options={(categoryList.data?.items ?? []).map((c) => ({ value: c.id, label: c.name }))} />
           </Field>
           <Field label="Proveedor" width={170}>
-            <Select value={supplierId} onChange={setSupplierId} placeholder="Todos"
+            <Select value={supplierId} onChange={(v) => filters.set('supplierId', v)}
+              placeholder="Todos"
               options={(supplierList.data?.items ?? []).map((s) => ({ value: s.id, label: s.name }))} />
           </Field>
           <Field label="Estado" width={128}>
-            <Select value={status} onChange={setStatus} options={[
-              { value: 'active', label: 'Activos' },
-              { value: 'inactive', label: 'Inactivos' },
-              { value: 'all', label: 'Todos' },
-            ]} />
+            <Select
+              value={status}
+              onChange={(v) => filters.set('status', v === 'inactive' || v === 'all' ? v : 'active')}
+              options={[
+                { value: 'active', label: 'Activos' },
+                { value: 'inactive', label: 'Inactivos' },
+                { value: 'all', label: 'Todos' },
+              ]}
+            />
           </Field>
           <Field label="Stock" width={152}>
-            <Toggle checked={lowStockOnly} onChange={setLowStockOnly}
+            <Toggle checked={lowStockOnly} onChange={(v) => filters.set('lowStockOnly', v)}
               label="Solo stock bajo" tone="danger" />
           </Field>
         </FilterBar>
@@ -353,18 +377,15 @@ export function Products() {
           loading={list.isLoading}
           empty={(
             <EmptyState
-              title={filtered ? 'Sin resultados con estos filtros' : 'Todavía no hay productos'}
-              detail={filtered
+              title={filters.isFiltered
+                ? 'Sin resultados con estos filtros'
+                : 'Todavía no hay productos'}
+              detail={filters.isFiltered
                 ? 'Prueba con otro término o limpia los filtros activos.'
                 : 'Crea el primer producto para empezar a registrar movimientos.'}
-              action={filtered ? (
-                <Button icon="x" size="sm" onClick={() => {
-                  setSearchInput(''); setCategoryId(''); setSupplierId('');
-                  setStatus('active'); setLowStockOnly(false);
-                }}>
-                  Limpiar filtros
-                </Button>
-              ) : writable ? (
+              action={filters.isFiltered ? (
+                <Button icon="x" size="sm" onClick={filters.reset}>Limpiar filtros</Button>
+              ) : canCreate ? (
                 <Button kind="primary" icon="plus" size="sm" onClick={() => setCreating(true)}>
                   Nuevo producto
                 </Button>
@@ -373,7 +394,14 @@ export function Products() {
           )}
         />
 
-        {list.data ? <Pager data={list.data} onPage={setPage} /> : null}
+        {list.data ? (
+          <Pager
+            data={list.data}
+            onPage={(p) => filters.set('page', p)}
+            pageSize={pageSize}
+            onPageSize={(size) => filters.set('pageSize', size)}
+          />
+        ) : null}
       </Card>
 
       {creating ? <ProductModal editing={null} onClose={() => setCreating(false)} /> : null}

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockHex_API.Api.Extensions;
+using StockHex_API.Domain.Authorization;
 using StockHex_API.Application.DTOs;
 using StockHex_API.Application.UseCases.ClientUseCases;
 using StockHex_API.Domain.Common;
@@ -10,6 +11,7 @@ namespace StockHex_API.Api.Controllers;
 [ApiController]
 [Route("api/clients")]
 [Authorize]
+[RequirePermission(Permissions.Clients.View)]
 public sealed class ClientsController : ControllerBase
 {
     private readonly CreateClient _create;
@@ -48,7 +50,7 @@ public sealed class ClientsController : ControllerBase
         (await _getById.RunAsync(id, cancellationToken)).ToOk();
 
     [HttpPost]
-    [Authorize(Roles = Roles.AdminOrManager)]
+    [RequirePermission(Permissions.Clients.Create)]
     [ProducesResponseType(typeof(ClientResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -59,7 +61,7 @@ public sealed class ClientsController : ControllerBase
             .ToCreated(nameof(GetClientByIdAsync), c => new { id = c.Id });
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Roles.AdminOrManager)]
+    [RequirePermission(Permissions.Clients.Edit)]
     [ProducesResponseType(typeof(ClientResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -70,7 +72,7 @@ public sealed class ClientsController : ControllerBase
         (await _update.RunAsync(id, request, cancellationToken)).ToOk();
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = Roles.AdminOrManager)]
+    [RequirePermission(Permissions.Clients.Delete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

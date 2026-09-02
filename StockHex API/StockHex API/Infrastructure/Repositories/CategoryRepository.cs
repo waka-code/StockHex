@@ -60,7 +60,17 @@ public sealed class CategoryRepository : ICategoryRepository
     public async Task AddAsync(Category category, CancellationToken cancellationToken = default) =>
         await _context.Categories.AddAsync(category, cancellationToken);
 
-    public void Update(Category category) => _context.Categories.Update(category);
+    /// <summary>
+    /// Con la entidad ya rastreada no hace falta hacer nada: el tracker detecta los
+    /// cambios solo. Llamar a Update() marcaría todo el grafo como Modified,
+    /// incluidos los hijos recién añadidos, y EF intentaría un UPDATE de filas que
+    /// todavía no existen. Sólo una entidad desprendida necesita adjuntarse.
+    /// </summary>
+    public void Update(Category category)
+    {
+        if (_context.Entry(category).State == EntityState.Detached)
+            _context.Categories.Update(category);
+    }
 
     public void Remove(Category category) => _context.Categories.Remove(category);
 }

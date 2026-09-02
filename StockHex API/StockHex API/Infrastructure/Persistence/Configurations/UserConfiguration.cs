@@ -24,11 +24,14 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(255);
 
-        // Guardado como texto: legible en la base y estable si se reordena el enum.
-        builder.Property(u => u.Role)
-            .IsRequired()
-            .HasConversion<string>()
-            .HasMaxLength(20);
+        // Restrict: borrar un rol no debe arrastrar a sus usuarios. La use case
+        // exige reasignarlos primero.
+        builder.HasOne(u => u.Role)
+            .WithMany(r => r.Users)
+            .HasForeignKey(u => u.RoleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(u => u.RoleId).HasDatabaseName("IX_Users_RoleId");
 
         builder.Property(u => u.IsActive).IsRequired();
         builder.Property(u => u.EmailConfirmed).IsRequired();

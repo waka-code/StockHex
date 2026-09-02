@@ -57,7 +57,17 @@ public sealed class SupplierRepository : ISupplierRepository
     public async Task AddAsync(Supplier supplier, CancellationToken cancellationToken = default) =>
         await _context.Suppliers.AddAsync(supplier, cancellationToken);
 
-    public void Update(Supplier supplier) => _context.Suppliers.Update(supplier);
+    /// <summary>
+    /// Con la entidad ya rastreada no hace falta hacer nada: el tracker detecta los
+    /// cambios solo. Llamar a Update() marcaría todo el grafo como Modified,
+    /// incluidos los hijos recién añadidos, y EF intentaría un UPDATE de filas que
+    /// todavía no existen. Sólo una entidad desprendida necesita adjuntarse.
+    /// </summary>
+    public void Update(Supplier supplier)
+    {
+        if (_context.Entry(supplier).State == EntityState.Detached)
+            _context.Suppliers.Update(supplier);
+    }
 
     public void Remove(Supplier supplier) => _context.Suppliers.Remove(supplier);
 }

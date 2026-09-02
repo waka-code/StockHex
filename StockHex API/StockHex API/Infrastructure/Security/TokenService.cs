@@ -26,8 +26,11 @@ public sealed class TokenService : ITokenService
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Name),
             new(ClaimTypes.Email, user.Email),
-            // ClaimTypes.Role es el claim que lee [Authorize(Roles = ...)].
-            new(ClaimTypes.Role, user.Role.ToString()),
+            // El token lleva el ID del rol, no sus permisos: así quitar un permiso
+            // surte efecto sin esperar a que el token se renueve. El nombre va
+            // aparte y sólo para mostrar.
+            new(StockHexClaims.RoleId, user.RoleId.ToString()),
+            new(ClaimTypes.Role, user.Role?.Name ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

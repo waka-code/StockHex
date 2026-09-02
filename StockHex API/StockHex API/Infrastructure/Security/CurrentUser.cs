@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using StockHex_API.Application.Abstractions;
-using StockHex_API.Domain.Enums;
 
 namespace StockHex_API.Infrastructure.Security;
 
@@ -20,10 +19,19 @@ public sealed class CurrentUser : ICurrentUser
 
     public string? Email => Principal?.FindFirstValue(ClaimTypes.Email);
 
-    public UserRole? Role =>
-        Enum.TryParse<UserRole>(Principal?.FindFirstValue(ClaimTypes.Role), out var role)
-            ? role
+    public Guid? RoleId =>
+        Guid.TryParse(Principal?.FindFirstValue(StockHexClaims.RoleId), out var roleId)
+            ? roleId
             : null;
 
+    public string? RoleName => Principal?.FindFirstValue(ClaimTypes.Role);
+
     public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated ?? false;
+}
+
+/// <summary>Claims propios de StockHex, fuera de los registrados.</summary>
+public static class StockHexClaims
+{
+    /// <summary>Id del rol. Es lo único que el token dice sobre autorización.</summary>
+    public const string RoleId = "role_id";
 }

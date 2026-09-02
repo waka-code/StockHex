@@ -1,5 +1,3 @@
-using StockHex_API.Domain.Enums;
-
 namespace StockHex_API.Domain.Entities;
 
 public class User
@@ -13,7 +11,10 @@ public class User
     /// <summary>Hash BCrypt. Nunca se expone en un DTO de respuesta.</summary>
     public string PasswordHash { get; set; } = string.Empty;
 
-    public UserRole Role { get; set; } = UserRole.Operator;
+    public Guid RoleId { get; set; }
+
+    /// <summary>El rol define qué puede hacer. Se carga cuando hace falta resolver permisos.</summary>
+    public Role? Role { get; set; }
 
     public bool IsActive { get; set; } = true;
 

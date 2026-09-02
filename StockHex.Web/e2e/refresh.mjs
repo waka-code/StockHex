@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 
-const APP = process.env.APP_URL ?? 'http://localhost:5173';
+const APP = process.env.APP_URL ?? 'http://localhost:8080';
 // En el stack dockerizado la API cuelga del mismo origen que la aplicación.
 const API = process.env.API_URL ?? 'http://localhost:8080';
 const browser = await chromium.launch();

@@ -87,10 +87,10 @@ public sealed class AuthController : ControllerBase
         CancellationToken cancellationToken) =>
         (await _logout.RunAsync(request, cancellationToken)).ToNoContent();
 
-    /// <summary>Perfil del usuario dueño del token.</summary>
+    /// <summary>Perfil del usuario dueño del token, con sus permisos efectivos.</summary>
     [HttpGet("me")]
     [Authorize]
-    [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(CurrentUserResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> MeAsync(CancellationToken cancellationToken) =>
         (await _getCurrentUser.RunAsync(cancellationToken)).ToOk();

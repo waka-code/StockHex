@@ -2,23 +2,33 @@ import { categories, clients, suppliers } from '../api/endpoints';
 import type { CategoryResponse, ClientResponse, SupplierResponse } from '../api/types';
 import { Field, Input, TextArea } from '../components/Field';
 import { IconButton, Note } from '../components/ui';
+import { P } from '../auth/permissions';
 import { CrudPage } from './CrudPage';
 
 /** Papelera deshabilitada cuando hay filas dependientes: la API responde 409. */
 function RowActions({
-  writable, blocked, onEdit, onRemove,
-}: { writable: boolean; blocked: boolean; onEdit: () => void; onRemove: () => void }) {
+  writable, canEdit, canDelete, blocked, onEdit, onRemove,
+}: {
+  writable: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  blocked: boolean;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
   if (!writable) return null;
   return (
     <span style={{ display: 'inline-flex', gap: 2 }}>
-      <IconButton icon="pencil" title="Editar" onClick={onEdit} />
-      <IconButton
-        icon="trash"
-        title={blocked ? 'Tiene registros asociados' : 'Eliminar'}
-        tone="dang"
-        disabled={blocked}
-        onClick={onRemove}
-      />
+      {canEdit ? <IconButton icon="pencil" title="Editar" onClick={onEdit} /> : null}
+      {canDelete ? (
+        <IconButton
+          icon="trash"
+          title={blocked ? 'Tiene registros asociados' : 'Eliminar'}
+          tone="dang"
+          disabled={blocked}
+          onClick={onRemove}
+        />
+      ) : null}
     </span>
   );
 }
@@ -32,6 +42,7 @@ export function Categories() {
     <CrudPage<CategoryResponse, CategoryForm>
       title="Categorías"
       singular="categoría"
+      permissions={P.categories}
       gender="f"
       queryKey="categories"
       searchPlaceholder="Buscar por nombre o descripción…"
@@ -58,7 +69,7 @@ export function Categories() {
           deshabilitada y la API responde <strong>409</strong>.
         </Note>
       )}
-      columns={({ writable, edit, remove }) => [
+      columns={({ writable, canEdit, canDelete, edit, remove }) => [
         {
           key: 'name', header: 'Nombre',
           render: (row) => <span style={{ fontWeight: 500 }}>{row.name}</span>,
@@ -78,6 +89,8 @@ export function Categories() {
           render: (row) => (
             <RowActions
               writable={writable}
+              canEdit={canEdit}
+              canDelete={canDelete}
               blocked={row.productCount > 0}
               onEdit={() => edit(row)}
               onRemove={() => remove(row)}
@@ -110,6 +123,7 @@ export function Suppliers() {
     <CrudPage<SupplierResponse, SupplierForm>
       title="Proveedores"
       singular="proveedor"
+      permissions={P.suppliers}
       gender="m"
       queryKey="suppliers"
       searchPlaceholder="Buscar por nombre o email…"
@@ -145,7 +159,7 @@ export function Suppliers() {
           no se puede eliminar; la API responde <strong>409</strong>.
         </Note>
       )}
-      columns={({ writable, edit, remove }) => [
+      columns={({ writable, canEdit, canDelete, edit, remove }) => [
         {
           key: 'name', header: 'Nombre',
           render: (row) => (
@@ -178,6 +192,8 @@ export function Suppliers() {
           render: (row) => (
             <RowActions
               writable={writable}
+              canEdit={canEdit}
+              canDelete={canDelete}
               blocked={row.productCount > 0}
               onEdit={() => edit(row)}
               onRemove={() => remove(row)}
@@ -220,6 +236,7 @@ export function Clients() {
     <CrudPage<ClientResponse, ClientForm>
       title="Clientes"
       singular="cliente"
+      permissions={P.clients}
       gender="m"
       queryKey="clients"
       searchPlaceholder="Buscar por nombre, email o teléfono…"
@@ -253,7 +270,7 @@ export function Clients() {
           no se puede eliminar; la API responde <strong>409</strong>.
         </Note>
       )}
-      columns={({ writable, edit, remove }) => [
+      columns={({ writable, canEdit, canDelete, edit, remove }) => [
         {
           key: 'name', header: 'Nombre',
           render: (row) => <span style={{ fontWeight: 500 }}>{row.name}</span>,
@@ -281,6 +298,8 @@ export function Clients() {
           render: (row) => (
             <RowActions
               writable={writable}
+              canEdit={canEdit}
+              canDelete={canDelete}
               blocked={false}
               onEdit={() => edit(row)}
               onRemove={() => remove(row)}

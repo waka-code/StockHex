@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockHex_API.Api.Extensions;
+using StockHex_API.Domain.Authorization;
 using StockHex_API.Application.DTOs;
 using StockHex_API.Application.UseCases.ReportUseCases;
 using StockHex_API.Domain.Common;
@@ -10,6 +11,7 @@ namespace StockHex_API.Api.Controllers;
 [ApiController]
 [Route("api/reports")]
 [Authorize]
+[RequirePermission(Permissions.Reports.View)]
 public sealed class ReportsController : ControllerBase
 {
     private readonly GetInventorySummary _summary;
