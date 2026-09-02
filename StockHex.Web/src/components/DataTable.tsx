@@ -1,9 +1,15 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import { EmptyState, Spinner } from './ui';
 import { PAGE_SIZES, type PagedResponse, type PageSize } from '../api/types';
 
 export interface Column<T> {
+  /**
+   * La última columna con la clave `actions` queda **fijada a la derecha**: cuando
+   * la tabla no cabe y hay que desplazarla, la acción principal de la fila tiene
+   * que seguir alcanzable sin descubrir un scroll horizontal. Las siete tablas del
+   * proyecto ya la nombran así.
+   */
   key: string;
   header: ReactNode;
   align?: 'left' | 'right' | 'center';
@@ -23,9 +29,61 @@ interface Props<T> {
   onRowClick?: (row: T) => void;
 }
 
+/**
+ * Ancho mínimo de una columna sin `width` declarado. Las flexibles son siempre
+ * las de nombre, producto o descripción, y son las que absorben el espacio
+ * sobrante cuando la tabla cabe holgada.
+ */
+const FLEXIBLE_COLUMN_MIN = 160;
+
 export function DataTable<T>({
   columns, rows, rowKey, loading, empty, rowTone, onRowClick,
 }: Props<T>) {
+  // El `width` de cada columna es una sugerencia que el navegador ignora en
+  // cuanto la tabla no cabe: con `width: 100%` y sin mínimo, en vez de
+  // desbordar comprime las columnas y parte el texto en tres líneas, dejando
+  // filas de más de cien píxeles de alto. Sumando los anchos declarados la
+  // tabla sí desborda, y el contenedor de arriba —que ya pedía `overflowX:
+  // auto`— por fin tiene algo que desplazar.
+  const minWidth = columns.reduce(
+    (total, column) => total + (column.width ?? FLEXIBLE_COLUMN_MIN),
+    0,
+  );
+
+  // Con la tabla desplazándose, la columna de acciones sería lo primero en salir
+  // de la vista justo por ser la última, y es la que lleva el botón de la fila.
+  const pinnedKey = columns[columns.length - 1]?.key === 'actions' ? 'actions' : null;
+
+  // El separador de la columna fijada sólo aparece cuando hay algo pasando por
+  // debajo. En una tabla que cabe entera sería una línea de más, y la mayoría
+  // caben: sólo Movimientos y Productos desbordan a anchos de portátil.
+  const scroller = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const node = scroller.current;
+    if (!node) return;
+
+    const update = () => setScrolled(node.scrollLeft > 0);
+    update();
+
+    node.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      node.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [rows.length]);
+
+  const pin = (isPinned: boolean, background: string): CSSProperties => (isPinned
+    ? {
+      position: 'sticky',
+      right: 0,
+      background,
+      borderLeft: scrolled ? '1px solid var(--bord)' : '1px solid transparent',
+    }
+    : {});
+
   if (loading) return <Spinner label="Cargando…" />;
 
   if (rows.length === 0) {
@@ -33,8 +91,8 @@ export function DataTable<T>({
   }
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+    <div ref={scroller} style={{ overflowX: 'auto' }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth }}>
         <thead>
           <tr>
             {columns.map((column) => (
@@ -46,7 +104,10 @@ export function DataTable<T>({
                   letterSpacing: '.06em', textAlign: column.align ?? 'left',
                   width: column.width, whiteSpace: 'nowrap',
                   background: 'var(--surf2)', borderBottom: '1px solid var(--bord)',
-                  position: 'sticky', top: 0, zIndex: 1,
+                  // La cabecera fijada compone los dos ejes: `top` la mantiene
+                  // arriba y `right`, si es la columna fijada, a la derecha.
+                  position: 'sticky', top: 0, zIndex: column.key === pinnedKey ? 2 : 1,
+                  ...pin(column.key === pinnedKey, 'var(--surf2)'),
                 }}
               >
                 {column.header}
@@ -71,6 +132,10 @@ export function DataTable<T>({
                     padding: '9px 12px', fontSize: 12.5, verticalAlign: 'middle',
                     textAlign: column.align ?? 'left',
                     borderBottom: index === rows.length - 1 ? undefined : '1px solid var(--bord)',
+                    // El fondo tiene que ser opaco para que el contenido que pasa
+                    // por debajo al desplazar no se transparente; se respeta el
+                    // tono de la fila cuando lo hay.
+                    ...pin(column.key === pinnedKey, rowTone?.(row) ?? 'var(--surf)'),
                   }}
                 >
                   {column.render(row)}

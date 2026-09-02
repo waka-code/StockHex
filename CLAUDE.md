@@ -118,6 +118,7 @@ ls "StockHex API/StockHex API/Application/UseCases"
 | Traducción de errores de la API | `api/problem.ts` + `components/Toast.tsx` | ningún `catch` con mensaje propio |
 | Patrón CRUD de tabla + modal | `pages/CrudPage.tsx` | Categorías, Proveedores y Clientes lo usan |
 | Tabla densa y paginación | `components/DataTable.tsx` | ninguna `<table>` a mano |
+| Columna de acciones de una fila | última columna, con `key: 'actions'` | ninguna otra clave: es la que `DataTable` fija a la derecha |
 
 ---
 
@@ -515,6 +516,13 @@ Reglas de estilo del frontend:
   `movements` y `reports`, porque los tres cambian.
 - Español de Chile. Pesos sin decimales con punto de miles (`lib/format.ts`).
   Fechas en 24 horas.
+- **Una tabla que no cabe se desplaza; no se comprime.** `DataTable` le pone a la
+  `<table>` un `minWidth` igual a la suma de los anchos de sus columnas, porque
+  `width` a secas es una sugerencia que el navegador ignora bajo presión: el
+  resultado era una tabla encogida con el texto partido en tres líneas y filas de
+  93 píxeles, en vez del desplazamiento horizontal que el contenedor ya pedía. Al
+  declarar el `width` de una columna se está fijando ese mínimo, así que conviene
+  que sea el ancho real que necesita el contenido.
 
 ### Verificación mínima antes de dar algo por hecho
 
