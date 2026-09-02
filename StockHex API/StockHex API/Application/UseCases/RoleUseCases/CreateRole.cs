@@ -12,12 +12,18 @@ public sealed class CreateRole
 {
     private readonly IRoleRepository _roles;
     private readonly IPermissionResolver _permissions;
+    private readonly PermissionEscalationGuard _escalation;
     private readonly IUnitOfWork _unitOfWork;
 
-    public CreateRole(IRoleRepository roles, IPermissionResolver permissions, IUnitOfWork unitOfWork)
+    public CreateRole(
+        IRoleRepository roles,
+        IPermissionResolver permissions,
+        PermissionEscalationGuard escalation,
+        IUnitOfWork unitOfWork)
     {
         _roles = roles;
         _permissions = permissions;
+        _escalation = escalation;
         _unitOfWork = unitOfWork;
     }
 
@@ -40,6 +46,13 @@ public sealed class CreateRole
                     [$"Permisos desconocidos: {string.Join(", ", unknown)}."],
             }));
 
+        var wanted = Permissions.Normalize(request.Permissions);
+
+        // Un rol nuevo se crea desde cero, así que todo lo que conceda es alta.
+        var escalation = await _escalation.RejectEscalationAsync(wanted, [], cancellationToken);
+        if (escalation is not null)
+            return Result<RoleResponse>.Failure(escalation);
+
         var role = new Role
         {
             Name = name,
@@ -47,7 +60,7 @@ public sealed class CreateRole
             IsSystem = false,
         };
 
-        foreach (var key in Permissions.Normalize(request.Permissions))
+        foreach (var key in wanted)
             role.Permissions.Add(new RolePermission { RoleId = role.Id, Permission = key });
 
         await _roles.AddAsync(role, cancellationToken);

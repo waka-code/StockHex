@@ -15,14 +15,25 @@ namespace StockHex_API.Tests.UseCases;
 /// </summary>
 public sealed class RoleCrudTests
 {
+    /// <summary>
+    /// Quien llama tiene, por defecto, el catálogo completo: es lo que necesita la
+    /// mayoría de los tests para no chocar con el guardia de escalada. Su rol se
+    /// sirve desde el resolver y no como fila, porque varios tests afirman cuántos
+    /// roles hay en la base.
+    /// </summary>
     private static (CreateRole Create, UpdateRole Update, DeleteRole Delete, StubPermissionResolver Resolver)
-        Build(ApplicationDbContext context)
+        Build(ApplicationDbContext context, IEnumerable<string>? callerPermissions = null)
     {
         var repository = new RoleRepository(context);
-        var resolver = new StubPermissionResolver(context);
+        var callerRoleId = Guid.NewGuid();
+        var resolver = new StubPermissionResolver(context)
+            .With(callerRoleId, callerPermissions ?? Permissions.All);
+        var caller = new StubCurrentUser(Guid.NewGuid(), callerRoleId);
+        var guard = new PermissionEscalationGuard(caller, resolver);
+
         return (
-            new CreateRole(repository, resolver, context),
-            new UpdateRole(repository, resolver, context),
+            new CreateRole(repository, resolver, guard, context),
+            new UpdateRole(repository, resolver, guard, context),
             new DeleteRole(repository, resolver, context),
             resolver);
     }
@@ -222,6 +233,106 @@ public sealed class RoleCrudTests
         result.IsSuccess.Should().BeTrue();
         context.Roles.Should().BeEmpty();
         resolver.InvalidateCalls.Should().Be(1);
+    }
+
+    // ─────────────────────────────────────────── guardia de escalada
+
+    [Fact]
+    public async Task No_se_puede_crear_un_rol_con_permisos_que_uno_no_tiene()
+    {
+        using var context = TestDbContextFactory.Create();
+        // Sabe administrar roles, pero no toca usuarios ni borra productos.
+        var (create, _, _, _) = Build(context, callerPermissions:
+            [Permissions.Roles.View, Permissions.Roles.Create, Permissions.Products.View]);
+
+        var result = await create.RunAsync(new CreateRoleRequest(
+            "Títere", null, [Permissions.Products.View, Permissions.Users.Edit]));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Type.Should().Be(ErrorType.Forbidden);
+        result.Error.Message.Should().Contain(Permissions.Users.Edit);
+        context.Roles.Should().BeEmpty("el rol no llega a crearse");
+    }
+
+    [Fact]
+    public async Task Se_puede_crear_un_rol_dentro_de_los_propios_permisos()
+    {
+        using var context = TestDbContextFactory.Create();
+        var (create, _, _, _) = Build(context, callerPermissions:
+            [Permissions.Roles.Create, Permissions.Products.View, Permissions.Movements.Create]);
+
+        var result = await create.RunAsync(new CreateRoleRequest(
+            "Cajero", null, [Permissions.Products.View, Permissions.Movements.Create]));
+
+        result.IsSuccess.Should().BeTrue("delegar un subconjunto de lo propio es legítimo");
+        result.Value.PermissionCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Nadie_se_concede_a_si_mismo_un_permiso_que_no_tiene()
+    {
+        using var context = TestDbContextFactory.Create();
+        // El escenario que abre el agujero: el rol propio, con roles.edit, se marca
+        // el resto de la matriz y sale siendo superusuario.
+        var own = TestData.Role("Coordinador", isSystem: false, permissions:
+            [Permissions.Roles.View, Permissions.Roles.Edit, Permissions.Users.Edit]);
+        context.AddRange(own, TestData.User(own, "coord@test.local"));
+        await context.SaveChangesAsync();
+
+        var repository = new RoleRepository(context);
+        var resolver = new StubPermissionResolver(context);
+        var caller = new StubCurrentUser(Guid.NewGuid(), own.Id);
+        var update = new UpdateRole(
+            repository, resolver, new PermissionEscalationGuard(caller, resolver), context);
+
+        var result = await update.RunAsync(own.Id, new UpdateRoleRequest(
+            own.Name, null, [.. Permissions.All]));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Type.Should().Be(ErrorType.Forbidden);
+        context.RolePermissions.Count(p => p.RoleId == own.Id).Should().Be(3,
+            "el rol se queda exactamente como estaba");
+    }
+
+    [Fact]
+    public async Task Se_puede_editar_un_rol_mas_poderoso_sin_agregarle_permisos()
+    {
+        using var context = TestDbContextFactory.Create();
+        var powerful = TestData.Role("Auditor", isSystem: false, permissions:
+            [Permissions.Reports.View, Permissions.Users.Delete]);
+        context.Add(powerful);
+        await context.SaveChangesAsync();
+
+        // Quien edita no tiene users.delete, pero tampoco lo está concediendo:
+        // sólo cambia el nombre y reenvía la lista tal cual.
+        var (_, update, _, _) = Build(context, callerPermissions:
+            [Permissions.Roles.View, Permissions.Roles.Edit, Permissions.Reports.View]);
+
+        var result = await update.RunAsync(powerful.Id, new UpdateRoleRequest(
+            "Auditor interno", "Renombrado", [Permissions.Reports.View, Permissions.Users.Delete]));
+
+        result.IsSuccess.Should().BeTrue("reenviar lo que ya concedía no es escalada");
+        result.Value.Name.Should().Be("Auditor interno");
+    }
+
+    [Fact]
+    public async Task Quitar_un_permiso_ajeno_tampoco_es_escalada()
+    {
+        using var context = TestDbContextFactory.Create();
+        var system = TestData.Role();
+        var other = TestData.Role("Auditor", isSystem: false, permissions:
+            [Permissions.Reports.View, Permissions.Products.Delete]);
+        context.AddRange(system, TestData.User(system, "admin@test.local"), other);
+        await context.SaveChangesAsync();
+
+        var (_, update, _, _) = Build(context, callerPermissions:
+            [Permissions.Roles.Edit, Permissions.Reports.View]);
+
+        var result = await update.RunAsync(other.Id, new UpdateRoleRequest(
+            other.Name, null, [Permissions.Reports.View]));
+
+        result.IsSuccess.Should().BeTrue("reducir permisos siempre está permitido");
+        result.Value.Permissions.Should().Equal(Permissions.Reports.View);
     }
 
     [Fact]

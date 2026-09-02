@@ -15,6 +15,17 @@ export interface AuthState {
   canAny: (...permissions: PermissionKey[]) => boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: (allSessions?: boolean) => Promise<void>;
+  /**
+   * Cambia la propia contraseña. La API cierra todas las sesiones y devuelve un
+   * par nuevo; esto lo guarda, así que el dispositivo desde el que se hizo el
+   * cambio sigue dentro y los demás quedan fuera. Llamar al endpoint directamente
+   * sin guardar la respuesta deja la sesión con un refresco ya revocado.
+   */
+  changeOwnPassword: (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string,
+  ) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);

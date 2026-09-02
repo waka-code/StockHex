@@ -149,6 +149,13 @@ static async Task ApplyMigrationsAsync(WebApplication app)
         await context.Database.MigrateAsync(cts.Token);
         logger.LogInformation("Migraciones aplicadas.");
 
+        // Antes de sembrar: el seeder busca a alguien con 'roles.edit' para decidir
+        // si hace falta un administrador inicial, y es esta sincronización la que
+        // garantiza que el rol de sistema conceda esa clave aunque el catálogo haya
+        // crecido desde la migración que lo creó.
+        var synchronizer = scope.ServiceProvider.GetRequiredService<PermissionSynchronizer>();
+        await synchronizer.SynchronizeAsync(cts.Token);
+
         var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
         await seeder.SeedAsync(cts.Token);
     }

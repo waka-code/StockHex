@@ -34,7 +34,18 @@ public class ApplicationDbContext : DbContext, IUnitOfWork
     /// mismo producto compiten por <see cref="Product.RowVersion"/>; sin reintento,
     /// un producto con rotación alta rechazaba la mayoría de peticiones simultáneas.
     /// </summary>
-    private const int MaxConcurrencyAttempts = 5;
+    /// <remarks>
+    /// Eran 5 con espera lineal. Medido contra SQL Server real, 25 movimientos
+    /// simultáneos sobre un mismo producto agotaban los intentos: con esa cantidad
+    /// de escritores compitiendo por una sola fila, una espera de 10–40 ms por
+    /// intento no separa lo suficiente a los perdedores y varios vuelven a chocar
+    /// en la misma ventana. El proveedor InMemory no reproduce el conflicto, así
+    /// que el tope se veía holgado y no lo era.
+    /// </remarks>
+    public const int MaxConcurrencyAttempts = 8;
+
+    /// <summary>Techo de la espera entre intentos, para que un pico no encole segundos.</summary>
+    private const int MaxBackoffMilliseconds = 500;
 
     public async Task<T> ExecuteWithConcurrencyRetryAsync<T>(
         Func<int, CancellationToken, Task<T>> operation,
@@ -53,12 +64,15 @@ public class ApplicationDbContext : DbContext, IUnitOfWork
                 // el mismo UPDATE condenado a fallar otra vez.
                 ChangeTracker.Clear();
 
-                // Espera con jitter: sin él, todos los perdedores de la carrera
-                // reintentarían a la vez y volverían a chocar.
-                var backoff = TimeSpan.FromMilliseconds(
-                    Random.Shared.Next(10, 40) * attempt);
+                // Espera exponencial con jitter: sin el jitter, todos los perdedores
+                // de la carrera reintentarían a la vez y volverían a chocar; sin el
+                // crecimiento exponencial, la ventana no se abre lo bastante rápido
+                // cuando los escritores son muchos y el reintento se agota.
+                var backoff = Math.Min(
+                    Random.Shared.Next(10, 40) * Math.Pow(2, attempt - 1),
+                    MaxBackoffMilliseconds);
 
-                await Task.Delay(backoff, cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(backoff), cancellationToken);
             }
         }
     }

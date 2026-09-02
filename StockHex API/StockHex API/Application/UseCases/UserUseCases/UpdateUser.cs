@@ -1,3 +1,4 @@
+using StockHex_API.Application.Abstractions;
 using StockHex_API.Application.DTOs;
 using StockHex_API.Application.Mappings;
 using StockHex_API.Domain.Authorization;
@@ -10,12 +11,18 @@ public sealed class UpdateUser
 {
     private readonly IUserRepository _users;
     private readonly IRoleRepository _roles;
+    private readonly IActiveUserResolver _activeUsers;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateUser(IUserRepository users, IRoleRepository roles, IUnitOfWork unitOfWork)
+    public UpdateUser(
+        IUserRepository users,
+        IRoleRepository roles,
+        IActiveUserResolver activeUsers,
+        IUnitOfWork unitOfWork)
     {
         _users = users;
         _roles = roles;
+        _activeUsers = activeUsers;
         _unitOfWork = unitOfWork;
     }
 
@@ -55,6 +62,10 @@ public sealed class UpdateUser
 
         _users.Update(user);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Desactivar sólo sirve si echa a quien ya estaba dentro: sin esto, su
+        // access token en curso seguiría abriendo la API hasta que expirara.
+        _activeUsers.Invalidate(user.Id);
 
         return user.ToResponse();
     }

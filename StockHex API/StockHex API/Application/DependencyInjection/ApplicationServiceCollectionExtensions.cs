@@ -69,6 +69,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<GetPermissionCatalog>();
         services.AddScoped<GetRoles>();
         services.AddScoped<GetRoleById>();
+        services.AddScoped<PermissionEscalationGuard>();
         services.AddScoped<CreateRole>();
         services.AddScoped<UpdateRole>();
         services.AddScoped<DeleteRole>();

@@ -11,12 +11,18 @@ public sealed class UpdateRole
 {
     private readonly IRoleRepository _roles;
     private readonly IPermissionResolver _permissions;
+    private readonly PermissionEscalationGuard _escalation;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateRole(IRoleRepository roles, IPermissionResolver permissions, IUnitOfWork unitOfWork)
+    public UpdateRole(
+        IRoleRepository roles,
+        IPermissionResolver permissions,
+        PermissionEscalationGuard escalation,
+        IUnitOfWork unitOfWork)
     {
         _roles = roles;
         _permissions = permissions;
+        _escalation = escalation;
         _unitOfWork = unitOfWork;
     }
 
@@ -43,6 +49,14 @@ public sealed class UpdateRole
             }));
 
         var wanted = Permissions.Normalize(request.Permissions).ToHashSet(StringComparer.Ordinal);
+
+        // Sólo se juzgan las altas: quitar permisos, o reenviar los que el rol ya
+        // concedía, no es escalada. Así se puede renombrar un rol más poderoso que
+        // el propio sin que el guardia lo confunda con un intento de subirse.
+        var escalation = await _escalation.RejectEscalationAsync(
+            wanted, role.PermissionKeys, cancellationToken);
+        if (escalation is not null)
+            return Result<RoleResponse>.Failure(escalation);
 
         // Un rol de sistema no se puede dejar sin los permisos críticos: es el
         // último recurso para volver a administrar el sistema.

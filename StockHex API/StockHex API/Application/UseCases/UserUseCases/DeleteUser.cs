@@ -10,17 +10,20 @@ public sealed class DeleteUser
     private readonly IUserRepository _users;
     private readonly IRoleRepository _roles;
     private readonly ICurrentUser _currentUser;
+    private readonly IActiveUserResolver _activeUsers;
     private readonly IUnitOfWork _unitOfWork;
 
     public DeleteUser(
         IUserRepository users,
         IRoleRepository roles,
         ICurrentUser currentUser,
+        IActiveUserResolver activeUsers,
         IUnitOfWork unitOfWork)
     {
         _users = users;
         _roles = roles;
         _currentUser = currentUser;
+        _activeUsers = activeUsers;
         _unitOfWork = unitOfWork;
     }
 
@@ -64,6 +67,7 @@ public sealed class DeleteUser
             user.UpdatedAt = DateTime.UtcNow;
             _users.Update(user);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+            _activeUsers.Invalidate(user.Id);
 
             return Result.Failure(Error.Conflict(
                 $"El usuario registró {movementCount} movimiento(s) de inventario, por lo que " +
@@ -72,6 +76,10 @@ public sealed class DeleteUser
 
         _users.Remove(user);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Su token sigue firmado y sin expirar; lo que lo invalida es que el
+        // resolver deje de encontrar la cuenta.
+        _activeUsers.Invalidate(user.Id);
 
         return Result.Success();
     }

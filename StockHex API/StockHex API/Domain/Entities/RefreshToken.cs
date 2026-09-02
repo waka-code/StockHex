@@ -45,4 +45,7 @@ public static class RevocationReasons
     public const string LoggedOut = "logged_out";
     public const string Reused = "reused";
     public const string UserDisabled = "user_disabled";
+
+    /// <summary>El dueño cambió su contraseña: las sesiones anteriores dejan de valer.</summary>
+    public const string PasswordChanged = "password_changed";
 }

@@ -113,9 +113,13 @@ public sealed class UsersController : ControllerBase
     /// <summary>
     /// Cambia la contraseña del usuario autenticado. Sin permiso especial: cada
     /// uno gestiona su propia credencial y aquí sí se exige la contraseña actual.
+    ///
+    /// Cierra todas las sesiones y devuelve un par de tokens nuevo: el dispositivo
+    /// desde el que se cambió continúa, el resto queda fuera. El cliente tiene que
+    /// reemplazar los tokens que guarda por los de la respuesta.
     /// </summary>
     [HttpPost("me/change-password")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> ChangeMyPasswordAsync(
@@ -126,6 +130,6 @@ public sealed class UsersController : ControllerBase
             return Unauthorized();
 
         return (await _changePassword.RunAsync(_currentUser.Id.Value, request, cancellationToken))
-            .ToNoContent();
+            .ToOk();
     }
 }

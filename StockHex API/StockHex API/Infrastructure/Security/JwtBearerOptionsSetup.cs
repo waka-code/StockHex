@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using StockHex_API.Application.Abstractions;
 
 namespace StockHex_API.Infrastructure.Security;
 
@@ -38,6 +40,30 @@ public sealed class JwtBearerOptionsSetup : IConfigureNamedOptions<JwtBearerOpti
             ValidateLifetime = true,
             // Sin tolerancia: un token expirado se rechaza de inmediato.
             ClockSkew = TimeSpan.Zero
+        };
+
+        // La firma sólo prueba que el token lo emitimos nosotros, no que la cuenta
+        // siga existiendo. Se comprueba aquí, en el único punto por el que pasa
+        // toda petición autenticada, y no en [RequirePermission]: así también
+        // quedan cubiertos los endpoints que sólo llevan [Authorize].
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var id = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!Guid.TryParse(id, out var userId))
+                {
+                    context.Fail("El token no identifica a ningún usuario.");
+                    return;
+                }
+
+                var users = context.HttpContext.RequestServices
+                    .GetRequiredService<IActiveUserResolver>();
+
+                if (!await users.IsActiveAsync(userId, context.HttpContext.RequestAborted))
+                    context.Fail("La cuenta está desactivada o ya no existe.");
+            }
         };
     }
 }

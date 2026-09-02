@@ -7,7 +7,7 @@ autenticación JWT y autorización por roles.
 - **Interfaz web** en React + Vite + TypeScript → [`StockHex.Web/`](StockHex.Web/README.md)
 
 ```
-[██████████] MVP funcional  ·  164/164 tests de API  ·  95 comprobaciones en navegador real
+[██████████] MVP funcional  ·  194/194 tests de API  ·  95 comprobaciones en navegador real
 ```
 
 > **Antes de implementar cualquier cosa, lee [`CLAUDE.md`](CLAUDE.md)**: son las
@@ -106,7 +106,7 @@ En `Development` se usa `appsettings.Development.json`, que ya trae valores loca
 ### Tests
 
 ```bash
-cd "StockHex API" && dotnet test     # 164 tests de la API
+cd "StockHex API" && dotnet test     # 194 tests de la API
 
 cd StockHex.Web
 npx playwright install chromium      # una vez
@@ -304,8 +304,10 @@ revertirse una vez, y una reversión no se puede revertir.
 
 **Concurrencia.** `Product.RowVersion` impide que dos movimientos simultáneos pisen el
 mismo stock. Para que esa protección no se traduzca en rechazos, las operaciones que
-mueven stock se reintentan hasta 5 veces releyendo el producto, con espera y jitter.
-Medido: 25 movimientos en paralelo sobre un mismo producto terminan en 25 éxitos y 0
+mueven stock se reintentan hasta 8 veces releyendo el producto, con espera
+exponencial y jitter.
+Verificado como test contra SQL Server real: 25 movimientos en paralelo sobre un
+mismo producto terminan en 25 éxitos y 0
 conflictos, con el stock exactamente igual al número de movimientos registrados.
 
 ### Productos — `/api/products`
@@ -349,9 +351,22 @@ quien la cambia no la conoce, y admite revocar sus sesiones para que tenga que e
 con la nueva. La propia contraseña se cambia en `me/change-password`, que sí exige la
 actual.
 
+**`me/change-password` cierra todas las sesiones y devuelve un `AuthResponse`.** Es
+lo que hace alguien que cree que le robaron la cuenta: dejar vivos los refrescos
+anteriores lo dejaría dentro hasta catorce días más. Como eso también mataría la
+sesión de quien está cambiando la contraseña, se emite un par nuevo en la misma
+respuesta — **el cliente tiene que guardarlo**, o su refresco quedará revocado y caerá
+al renovar. En el frontend eso lo hace `useAuth().changeOwnPassword(…)`, no la llamada
+directa al endpoint.
+
 Guardias: no se puede dejar el sistema **sin ningún usuario activo** con `roles.edit`
 y `users.edit`, ni eliminar la propia cuenta. Las respuestas **nunca** incluyen el
 hash de la contraseña.
+
+**Desactivar o eliminar echa de inmediato.** El JWT no se puede revocar, así que cada
+petición autenticada comprueba que la cuenta siga viva antes de mirar permisos
+(`IActiveUserResolver`, caché de 30 s invalidada al desactivar). Sin eso, el access
+token en curso seguiría abriendo la API hasta una hora después de la baja.
 
 ### Roles y permisos — `/api/roles` y `/api/permissions`
 
@@ -370,6 +385,19 @@ fuente: el frontend lo consume y no lo redeclara.
 `PUT` reemplaza el conjunto completo de permisos del rol; una clave que no esté en el
 catálogo se rechaza con `400`. Un rol de sistema no se elimina ni se queda sin los
 permisos críticos, y uno con usuarios asignados tampoco se elimina (`409`).
+
+**Nadie concede un permiso que él mismo no tiene** (`403`). Sin este guardia,
+`roles.edit` alcanzaba para todo: bastaba editar el rol propio, marcar el resto de la
+matriz y salir con permisos que nadie había concedido. Sólo se juzgan las **altas**,
+de modo que quitar permisos —o renombrar un rol más poderoso que el propio reenviando
+su lista tal cual— sigue funcionando.
+
+**El rol de sistema concede siempre el catálogo completo.** No se guarda como una
+foto: se reconcilia al arrancar contra `Permissions.All`. De lo contrario, agregar un
+permiso al código dejaría sin él al rol descrito como «acceso total», y el endpoint
+nuevo responderá `403` hasta al administrador hasta que alguien marcara la casilla
+a mano. El mismo paso borra de todos los roles las claves que ya salieron del
+catálogo: no conceden nada, pero la matriz las mostraba marcadas.
 
 ### Reportes — `/api/reports`
 
@@ -502,7 +530,8 @@ Se aplican automáticamente al arrancar salvo que se ponga `Database:MigrateOnSt
 
 ## Tests
 
-164 tests, todos en verde.
+194 tests, todos en verde. Trece de ellos corren contra un SQL Server real que
+levanta Testcontainers; sin Docker se omiten en lugar de fallar.
 
 | Suite | Cubre |
 |---|---|
@@ -518,7 +547,8 @@ Se aplican automáticamente al arrancar salvo que se ponga `Database:MigrateOnSt
 | `UseCases/LoginTests` | Credenciales, cuenta inactiva, no filtrar qué emails existen |
 | `UseCases/UserGuardTests` | Último administrador, auto-eliminación, cambio de contraseña |
 | `UseCases/ResetPasswordTests` | Restablecer la contraseña de otro usuario y revocar sus sesiones |
-| `UseCases/RoleCrudTests` | Crear, editar y borrar roles; rol de sistema; rol con usuarios; permisos críticos |
+| `UseCases/RoleCrudTests` | Crear, editar y borrar roles; rol de sistema; rol con usuarios; permisos críticos; guardia de escalada |
+| `UseCases/PermissionSyncTests` | El rol de sistema se deriva del catálogo; se purgan las claves obsoletas; idempotencia |
 | `UseCases/CorsOriginsTests` | Lectura de orígenes: arreglo, lista con `;`, barra final, duplicados |
 | `Authorization/PermissionCatalogTests` | El catálogo: claves únicas, módulos, permisos críticos, normalización |
 | `Security/PasswordHasherTests` | Roundtrip BCrypt, salt por hash, hashes corruptos |
@@ -527,9 +557,26 @@ Se aplican automáticamente al arrancar salvo que se ponga `Database:MigrateOnSt
 | `Integration/ApiEndpointsTests` | Pipeline HTTP completo: auth, roles, validación, flujo de inventario |
 | `Integration/AuthLifecycleTests` | Login, refresh, reutilización, logout y reversión por HTTP |
 | `Integration/RateLimitingTests` | 429 al superar el límite, `Retry-After`, alcance de la política |
+| `Database/SchemaConstraintTests` | **SQL Server real**: índices únicos, índice filtrado de reversión, colación del SKU, `Restrict` y cascada |
+| `Database/ConcurrencyOnSqlServerTests` | **SQL Server real**: el `rowversion` que genera el motor, 25 movimientos en paralelo, salidas que compiten por el último stock |
 
 Los tests de integración levantan la API real con `WebApplicationFactory` y el
 proveedor InMemory de EF.
+
+**Los de `Database/` corren contra un SQL Server real** que levanta Testcontainers
+con la misma imagen del compose. Existen porque el proveedor InMemory **no es
+relacional**: ignora los índices únicos, los índices filtrados, las colaciones y el
+`rowversion`. Es decir, las garantías que el diseño delega a propósito en la base
+—que un movimiento no se revierta dos veces, que dos SKU no colisionen, que dos
+movimientos simultáneos no se pisen el stock— eran justo las que ningún test
+cubría. Requieren Docker; sin él se **omiten** en lugar de fallar
+(`[RequiresDockerFact]`), así que `dotnet test` sigue funcionando en una máquina que
+no lo tenga. En CI siempre se ejecutan.
+
+Lo primero que encontraron: el reintento de concurrencia se agotaba con 25
+movimientos en paralelo. El tope de 5 intentos con espera lineal se veía holgado
+porque InMemory nunca provocaba el conflicto que lo pone a prueba. Ahora son 8 con
+espera exponencial, y el escenario del README es un test.
 
 ---
 

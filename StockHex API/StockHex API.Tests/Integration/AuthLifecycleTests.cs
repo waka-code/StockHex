@@ -235,4 +235,73 @@ public sealed class AuthLifecycleTests : IClassFixture<StockHexApiFactory>, IAsy
         page!.Items.Should().HaveCount(1);
         page.Items[0].SupplierName.Should().Be(supplier.Name);
     }
+
+    // ------------------------------------------------- Baja de la cuenta
+
+    [Fact]
+    public async Task Desactivar_a_un_usuario_invalida_su_access_token_en_curso()
+    {
+        var (admin, _) = await LoginAsync();
+
+        // Un usuario propio del test: los sembrados los comparte toda la clase.
+        var email = $"baja-{Guid.NewGuid():N}@test.local";
+        const string password = "Password123";
+        var roleId = await _factory.GetOperatorRoleIdAsync();
+
+        var created = (await (await admin.PostAsJsonAsync("/api/users",
+                new CreateUserRequest("De baja", email, password, password, roleId), Json))
+            .Content.ReadFromJsonAsync<UserResponse>(Json))!;
+
+        var suyo = _factory.CreateClient();
+        var auth = (await (await suyo.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest(email, password), Json)).Content.ReadFromJsonAsync<AuthResponse>(Json))!;
+        suyo.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        (await suyo.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var baja = await admin.PutAsJsonAsync($"/api/users/{created.Id}",
+            new UpdateUserRequest(created.Name, created.Email, roleId, IsActive: false), Json);
+        baja.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // El token sigue firmado y sin expirar; lo que lo corta es la comprobación
+        // de cuenta activa en OnTokenValidated.
+        (await suyo.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "desactivar a alguien tiene que echarlo, no esperar a que expire su token");
+        (await suyo.GetAsync("/api/products")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Cambiar_la_contrasena_devuelve_un_par_usable_y_mata_el_anterior()
+    {
+        var (admin, _) = await LoginAsync();
+
+        var email = $"cambio-{Guid.NewGuid():N}@test.local";
+        const string password = "Password123";
+        var roleId = await _factory.GetOperatorRoleIdAsync();
+
+        await admin.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("Cambia clave", email, password, password, roleId), Json);
+
+        var suyo = _factory.CreateClient();
+        var auth = (await (await suyo.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest(email, password), Json)).Content.ReadFromJsonAsync<AuthResponse>(Json))!;
+        suyo.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var respuesta = await suyo.PostAsJsonAsync("/api/users/me/change-password",
+            new ChangePasswordRequest(password, "NuevaPass123", "NuevaPass123"), Json);
+
+        respuesta.StatusCode.Should().Be(HttpStatusCode.OK);
+        var renovado = (await respuesta.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
+
+        // El refresco anterior murió con el cambio…
+        var viejo = _factory.CreateClient();
+        (await viejo.PostAsJsonAsync("/api/auth/refresh",
+            new RefreshTokenRequest(auth.RefreshToken), Json))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // …y el que devolvió el cambio sirve, así que el dispositivo no queda fuera.
+        (await viejo.PostAsJsonAsync("/api/auth/refresh",
+            new RefreshTokenRequest(renovado.RefreshToken), Json))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }

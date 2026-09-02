@@ -30,7 +30,25 @@ jobs:
           --no-restore
           -warnaserror
 
+      - name: Auditar dependencias
+        # `dotnet list package --vulnerable` sale con código 0 aunque encuentre
+        # algo, así que hay que mirar la salida. Se incluyen las transitivas
+        # porque es donde estaban: la API no referencia Azure.Identity ni
+        # System.Formats.Asn1, le llegan por Microsoft.Data.SqlClient.
+        run: |
+          dotnet list "StockHex API/StockHex API.sln" package \
+            --vulnerable --include-transitive 2>&1 | tee auditoria.txt
+          if grep -q -E '^[[:space:]]*>' auditoria.txt; then
+            echo "::error::Hay paquetes con vulnerabilidades conocidas."
+            exit 1
+          fi
+          echo "Sin paquetes vulnerables."
+
       - name: Ejecutar tests con cobertura
+        # Incluye los tests contra SQL Server real, que Testcontainers levanta en
+        # un contenedor. El runner de GitHub trae Docker, así que se ejecutan; en
+        # una máquina sin Docker se omiten solos ([RequiresDockerFact]) en vez de
+        # fallar. Por eso este paso tarda unos minutos más que el resto.
         run: >
           dotnet test "StockHex API/StockHex API.sln"
           --configuration Release
@@ -66,6 +84,11 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci
+
+      - name: Auditar dependencias
+        # Sólo las de producción: lo que termina en el bundle que sirve nginx.
+        # `npm audit` sí sale con código distinto de 0 cuando encuentra algo.
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Verificar tipos
         run: npm run typecheck

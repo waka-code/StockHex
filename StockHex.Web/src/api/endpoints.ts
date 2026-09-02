@@ -71,8 +71,14 @@ export const users = {
   create: (body: CreateUserRequest) => api.post<UserResponse>('/api/users', body),
   update: (id: string, body: UpdateUserRequest) => api.put<UserResponse>(`/api/users/${id}`, body),
   remove: (id: string) => api.del<void>(`/api/users/${id}`),
+  /**
+   * Cambia la propia contraseña. Cierra todas las sesiones y devuelve un par de
+   * tokens nuevo, así que hay que guardarlo: si no, el dispositivo desde el que
+   * se hizo el cambio se queda con un refresco ya revocado y cae al renovar.
+   * Para eso está `changeOwnPassword` en `auth/AuthContext`.
+   */
   changePassword: (body: ChangePasswordRequest) =>
-    api.post<void>('/api/users/me/change-password', body),
+    api.post<AuthResponse>('/api/users/me/change-password', body),
   /** Restablece la de otro usuario. Exige el permiso users.change_password. */
   resetPassword: (id: string, body: ResetPasswordRequest) =>
     api.post<void>(`/api/users/${id}/reset-password`, body),

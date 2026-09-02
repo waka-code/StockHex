@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using StockHex_API.Infrastructure.Persistence;
 using StockHex_API.Tests.Common;
 
 namespace StockHex_API.Tests.UseCases;
@@ -66,7 +67,9 @@ public sealed class ConcurrencyRetryTests
         });
 
         await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
-        attempts.Should().Be(5, "el tope de intentos");
+        // Se lee del propio contexto en vez de repetir el número: el tope subió al
+        // medir contra SQL Server real y un literal aquí lo habría dejado obsoleto.
+        attempts.Should().Be(ApplicationDbContext.MaxConcurrencyAttempts, "el tope de intentos");
     }
 
     [Fact]

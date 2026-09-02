@@ -59,6 +59,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IRoleRepository, RoleRepository>();
 
         services.AddScoped<DatabaseSeeder>();
+        services.AddScoped<PermissionSynchronizer>();
 
         return services;
     }
@@ -88,6 +89,7 @@ public static class InfrastructureServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+        services.AddSingleton<IActiveUserResolver, ActiveUserResolver>();
 
         // Resolver de permisos: singleton con caché propia, porque la consulta está
         // en el camino caliente de cada petición autorizada.

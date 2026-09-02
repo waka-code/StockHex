@@ -362,7 +362,7 @@ Verificado sobre el código actual. **No todo cumple**: lo que falta está decla
 como trabajo pendiente, no escondido.
 
 Última verificación: 2 de septiembre de 2026, con las reglas 4 a 8 implementadas.
-**164 tests de API** (build Release con 0 warnings) y **95 comprobaciones en
+**194 tests de API** (build Release con 0 warnings) y **95 comprobaciones en
 navegador real** (`npm run e2e` + `npm run e2e:proxy`), todo en verde.
 
 | Regla | Estado | Detalle |
@@ -428,7 +428,8 @@ Un movimiento equivocado **no se edita ni se borra**: se corrige con
 ### Autorización
 
 ```
-JWT (role_id) → [RequirePermission("x.y")] → IPermissionResolver → caché 30 s → DB
+JWT → OnTokenValidated → IActiveUserResolver → caché 30 s → DB   (¿la cuenta sigue viva?)
+    → [RequirePermission("x.y")] → IPermissionResolver → caché 30 s → DB   (¿puede?)
 ```
 
 El token lleva **sólo el id del rol**, nunca la lista de permisos: si la llevara,
@@ -437,15 +438,32 @@ hasta 60 minutos después. Se resuelven por petición con una caché de 30 segun
 se invalida explícitamente al editar un rol, así que el cambio se aplica de inmediato
 y sin cerrar la sesión de nadie.
 
+**La cuenta se comprueba antes que el permiso.** Un JWT no se puede revocar: vale
+hasta que expira. Sin `IActiveUserResolver`, desactivar o borrar a alguien no lo echa
+— su refresco falla, pero el access token en curso sigue abriendo todo hasta una hora
+después (ocho en `Development`). Va en `OnTokenValidated` y no en el filtro de
+permisos porque así cubre también los endpoints que sólo llevan `[Authorize]`.
+
 Guardias que protegen el acceso a la administración, todos en la API:
 
-- Un rol **de sistema** no se elimina ni se queda sin los permisos críticos.
+- Un rol **de sistema** no se elimina ni se queda sin los permisos críticos, y
+  **concede siempre el catálogo completo**: `PermissionSynchronizer` lo reconcilia al
+  arrancar. Es derivado, no almacenado — si fuera una foto de la migración que lo
+  creó, agregar un permiso nuevo dejaría al administrador sin él, en silencio.
+- **Nadie concede un permiso que él mismo no tiene** (`PermissionEscalationGuard`).
+  Sin esto `roles.edit` alcanza para todo: se edita el rol propio, se marca el resto
+  de la matriz y se sale siendo superusuario. Sólo se juzgan las **altas**, así que
+  quitar permisos o renombrar un rol más poderoso que el propio sigue funcionando.
 - Un rol **con usuarios asignados** no se elimina.
 - No se puede dejar el sistema **sin ningún usuario activo** con `roles.edit` y
   `users.edit`. «El último administrador» dejó de ser un valor y pasó a ser una
   capacidad.
 - Nadie elimina su propia cuenta ni restablece su propia contraseña por el atajo que
   no pide la actual.
+- **Cambiar la contraseña cierra todas las sesiones** y devuelve un par de tokens
+  nuevo en la misma respuesta. Es lo que hace quien cree que le robaron la cuenta;
+  dejar vivos los refrescos anteriores lo dejaría dentro catorce días más. El par
+  devuelto evita que el propio dispositivo quede con un refresco muerto.
 
 ### API · flujo de una petición
 
@@ -504,8 +522,13 @@ Reglas de estilo del frontend:
 # API
 cd "StockHex API" && dotnet build "StockHex API.sln" -c Release -warnaserror && dotnet test
 
+# Dependencias: el CI falla si aparece una vulnerabilidad conocida, así que
+# conviene verlo antes de empujar. Las transitivas cuentan: las que había
+# llegaban por Microsoft.Data.SqlClient, no de una referencia directa.
+dotnet list "StockHex API.sln" package --vulnerable --include-transitive
+
 # Frontend
-cd StockHex.Web && npm run typecheck && npm run lint && npm run build
+cd StockHex.Web && npm run typecheck && npm run lint && npm run build && npm audit --omit=dev
 
 # El stack completo, y el recorrido en navegador real
 docker compose up -d --build
@@ -519,6 +542,12 @@ sin poder entrar, con un timeout que parecía un fallo del producto. Por eso la 
 completa tarda varios minutos; una suite suelta (`npm run e2e:filters`) es inmediata.
 
 `-warnaserror` no es opcional: la solución compila con **0 warnings** y debe seguir así.
+
+`dotnet test` incluye los tests de `Database/`, que levantan un **SQL Server real**
+con Testcontainers. Son los únicos que verifican lo que el proveedor InMemory no
+puede: índices únicos, el índice filtrado de la reversión, la colación del SKU y el
+`rowversion`. **Sin Docker se omiten**, no fallan, así que un «13 skipped» en local
+significa que falta levantar Docker, no que algo esté roto.
 
 **El stack se levanta con un solo comando y los tres contenedores tienen que quedar
 `healthy`.** Comprobarlo, porque un `unhealthy` con el sitio aparentemente funcionando
@@ -544,7 +573,7 @@ contra `127.0.0.1`.
 | 2026-09-02 | Regla 8 · tamaño de página elegible (10/15/25), definido en el backend y reflejado en la URL | Pedida al cerrar la regla 4 |
 
 Reglas 4 a 8 implementadas el 2 de septiembre de 2026 (API y frontend), verificadas
-con **164 tests de API** y **95 comprobaciones en navegador real** repartidas en seis
+con **194 tests de API** y **95 comprobaciones en navegador real** repartidas en seis
 suites de Playwright.
 
 Cada regla nueva se agrega arriba con su fecha y se refleja en

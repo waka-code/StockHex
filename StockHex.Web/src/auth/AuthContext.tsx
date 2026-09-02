@@ -2,7 +2,7 @@ import {
   useCallback, useEffect, useMemo, useState, type ReactNode,
 } from 'react';
 import { getSession, onSessionChange, setSession } from '../api/client';
-import { auth as authApi } from '../api/endpoints';
+import { auth as authApi, users as usersApi } from '../api/endpoints';
 import type { PermissionKey } from '../api/types';
 import type { StoredSession } from './storage';
 import { AuthContext, type AuthState } from './context';
@@ -41,6 +41,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
+  const changeOwnPassword = useCallback(async (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string,
+  ) => {
+    // La API revoca todo lo anterior y emite un par nuevo en la misma respuesta.
+    // Guardarlo es lo que evita que quien cambió su contraseña se quede con un
+    // refresco muerto y caiga la próxima vez que el access token venza.
+    const renewed = await usersApi.changePassword({
+      currentPassword, newPassword, confirmPassword,
+    });
+    setSession(renewed);
+  }, []);
+
   const value = useMemo<AuthState>(() => ({
     user: session?.user ?? null,
     isAuthenticated: Boolean(session),
@@ -49,7 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canAny: (...wanted) => wanted.some((permission) => permissions.has(permission)),
     login,
     logout,
-  }), [session, permissions, login, logout]);
+    changeOwnPassword,
+  }), [session, permissions, login, logout, changeOwnPassword]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
