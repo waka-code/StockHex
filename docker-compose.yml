@@ -54,6 +54,11 @@ services:
       Seed__AdminName: ${SEED_ADMIN_NAME:-Administrador}
       Seed__AdminEmail: ${SEED_ADMIN_EMAIL:-admin@stockhex.local}
       Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:?define SEED_ADMIN_PASSWORD en .env}
+      # Datos de demostración para recorrer la aplicación en local: catálogo,
+      # clientes, usuarios con distintos roles y tres meses de movimientos.
+      # Se siembra una sola vez y SÓLO si esto vale "true". Déjalo apagado en
+      # cualquier entorno que no sea tu máquina.
+      Seed__DemoData: ${SEED_DEMO_DATA:-false}
       # Swagger expuesto para poder probar el MVP; ponlo en "false" en producción.
       Swagger__Enabled: ${SWAGGER_ENABLED:-true}
       # El frontend llega por el proxy de nginx, en el mismo origen, así que no

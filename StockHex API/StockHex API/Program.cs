@@ -158,6 +158,11 @@ static async Task ApplyMigrationsAsync(WebApplication app)
 
         var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
         await seeder.SeedAsync(cts.Token);
+
+        // Datos de demostración para mirar la aplicación en local. No hace nada
+        // salvo que Seed:DemoData esté encendido, y viene apagado.
+        var demo = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
+        await demo.SeedAsync(cts.Token);
     }
     catch (OperationCanceledException)
     {

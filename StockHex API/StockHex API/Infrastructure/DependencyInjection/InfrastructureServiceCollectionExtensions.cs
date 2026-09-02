@@ -60,6 +60,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<PermissionSynchronizer>();
+        services.AddScoped<DemoDataSeeder>();
 
         return services;
     }

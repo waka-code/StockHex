@@ -7,7 +7,7 @@ autenticación JWT y autorización por roles.
 - **Interfaz web** en React + Vite + TypeScript → [`StockHex.Web/`](StockHex.Web/README.md)
 
 ```
-[██████████] MVP funcional  ·  194/194 tests de API  ·  418 comprobaciones en navegador real
+[██████████] MVP funcional  ·  201/201 tests de API  ·  418 comprobaciones en navegador real
 ```
 
 > **Antes de implementar cualquier cosa, lee [`CLAUDE.md`](CLAUDE.md)**: son las
@@ -93,6 +93,67 @@ Aquí sí hay dos orígenes, así que el `.env` de la raíz ya trae
 `CORS_ALLOWED_ORIGINS=http://localhost:5173`. Detalles en el
 [README del frontend](StockHex.Web/README.md).
 
+### Datos de demostración (sólo local)
+
+Una base recién creada no enseña nada: los listados no paginan, los reportes salen en
+cero y la matriz de permisos no tiene a quién aplicarse. Para recorrer la aplicación
+con contenido real, enciende la siembra de demostración **antes del primer arranque**:
+
+```bash
+echo "SEED_DEMO_DATA=true" >> .env
+docker compose up -d --build
+```
+
+Sin Docker, la misma variable por entorno:
+
+```bash
+cd "StockHex API/StockHex API"
+Seed__DemoData=true dotnet run
+```
+
+Siembra un distribuidor de abarrotes con tres meses de historial:
+
+| | |
+|---|---|
+| Catálogo | 8 categorías, 8 proveedores, 14 clientes, 46 productos (2 descatalogados) |
+| Historial | ~835 movimientos repartidos en 90 días, con entradas, salidas, ajustes y **2 reversiones** |
+| Stock bajo | ~15 productos por debajo de su mínimo, para que el reporte y el aviso del panel tengan contenido |
+| Roles | los 3 de la migración más **Cajero** y **Auditor**, creados como los crearía un administrador |
+| Usuarios | 5, uno de ellos desactivado para probar el filtro y la expulsión por token |
+
+Los usuarios sembrados entran todos con la contraseña **`Demo1234`**, y sirven para ver
+la misma pantalla con distintos permisos:
+
+| Usuario | Rol | Qué se ve al entrar |
+|---|---|---|
+| `carolina@stockhex.local` | Jefe de bodega | Catálogo, movimientos y reportes; sin usuarios ni roles |
+| `matias@stockhex.local` | Bodeguero | Registra movimientos y consulta; no edita el catálogo |
+| `javiera@stockhex.local` | Cajero | Salidas de mostrador y clientes |
+| `rodrigo@stockhex.local` | Auditor | Sólo lectura: ve todo, no puede tocar nada |
+| `ignacio@stockhex.local` | Bodeguero | **Desactivado**: su login se rechaza |
+
+El administrador sigue siendo el de `SEED_ADMIN_EMAIL`.
+
+**Se siembra una sola vez.** El sembrador deja una marca de agua y en los arranques
+siguientes no hace nada, así que no duplica. Para volver a empezar:
+
+```bash
+docker compose down -v && docker compose up -d
+```
+
+> `Seed:DemoData` viene **apagado** y hay que encenderlo a mano. No se ata al entorno
+> `Development` a propósito: el compose local arranca como `Production`, así que
+> gatillarlo por entorno no serviría aquí y daría una falsa sensación de seguridad.
+> La protección real es que nadie lo enciende sin querer — déjalo en `false` en
+> cualquier sitio que no sea tu máquina.
+
+El sembrador **no se salta el invariante del dominio**: ningún producto nace con
+existencias. Se crean en cero y su stock es el acumulado de sus propios movimientos,
+con `StockBefore` y `StockAfter` encadenados. Lo verifica
+`UseCases/DemoDataSeederTests`, que recorre cada producto y comprueba que la cadena
+cuadre; sembrar un stock suelto habría producido justo el historial descuadrado que
+este sistema existe para impedir.
+
 ### La API en local, sin Docker
 
 ```bash
@@ -106,7 +167,7 @@ En `Development` se usa `appsettings.Development.json`, que ya trae valores loca
 ### Tests
 
 ```bash
-cd "StockHex API" && dotnet test     # 194 tests de la API
+cd "StockHex API" && dotnet test     # 201 tests de la API
 
 cd StockHex.Web
 npx playwright install chromium      # una vez
@@ -537,7 +598,7 @@ Se aplican automáticamente al arrancar salvo que se ponga `Database:MigrateOnSt
 
 ## Tests
 
-194 tests, todos en verde. Trece de ellos corren contra un SQL Server real que
+201 tests, todos en verde. Trece de ellos corren contra un SQL Server real que
 levanta Testcontainers; sin Docker se omiten en lugar de fallar.
 
 | Suite | Cubre |
@@ -555,6 +616,7 @@ levanta Testcontainers; sin Docker se omiten en lugar de fallar.
 | `UseCases/UserGuardTests` | Último administrador, auto-eliminación, cambio de contraseña |
 | `UseCases/ResetPasswordTests` | Restablecer la contraseña de otro usuario y revocar sus sesiones |
 | `UseCases/RoleCrudTests` | Crear, editar y borrar roles; rol de sistema; rol con usuarios; permisos críticos; guardia de escalada |
+| `UseCases/DemoDataSeederTests` | Que el sembrador de demostración no descuadre el libro mayor: cadena de stock, tipos coherentes, apagado por defecto, idempotencia |
 | `UseCases/PermissionSyncTests` | El rol de sistema se deriva del catálogo; se purgan las claves obsoletas; idempotencia |
 | `UseCases/CorsOriginsTests` | Lectura de orígenes: arreglo, lista con `;`, barra final, duplicados |
 | `Authorization/PermissionCatalogTests` | El catálogo: claves únicas, módulos, permisos críticos, normalización |
@@ -618,6 +680,16 @@ Lo que exigen las reglas del proyecto y todavía no está, en
 
 Y el resto:
 
+- **Mejorar la interfaz en móvil** — es el siguiente frente. Hoy *funciona* en un
+  teléfono: la barra lateral se convierte en un panel deslizante bajo 900px, las
+  tarjetas de indicadores se apilan y ninguna pantalla desborda el documento — lo
+  comprueba `e2e/stress.mjs` a 390px. Pero funcionar no es estar bien resuelto: las
+  tablas son densas y a 390px hay que **desplazarlas en horizontal fila a fila**,
+  porque una tabla de nueve columnas no cabe en un teléfono por mucho que se
+  encoja. Lo que falta es un diseño propio para pantalla estrecha —cada fila como
+  una tarjeta con lo importante arriba, el detalle desplegable y la acción a mano—
+  en vez de la misma tabla comprimida. Afecta sobre todo a Movimientos y Productos,
+  que son las que más columnas tienen
 - **Exportación de reportes** — `reports.export` ya existe en el catálogo y está
   concedida a dos roles, pero no hay endpoint que la exija. Al implementarla hay que
   exigir **esa** clave, no declarar una nueva
@@ -631,7 +703,7 @@ Y el resto:
 
 ## ¿Encontraste un error? Rómpelo y cuéntamelo
 
-Este proyecto se apoya en 194 tests de API y 418 comprobaciones en navegador, y aun
+Este proyecto se apoya en 201 tests de API y 418 comprobaciones en navegador, y aun
 así **cada revisión seria ha encontrado algo**: una tabla que se comprimía en vez de
 desplazarse en pantallas estrechas, un reintento de concurrencia que se agotaba con
 25 movimientos en paralelo, un `?categoryId=` corrupto que dejaba el listado con un

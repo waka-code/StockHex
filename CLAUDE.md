@@ -363,7 +363,7 @@ Verificado sobre el código actual. **No todo cumple**: lo que falta está decla
 como trabajo pendiente, no escondido.
 
 Última verificación: 2 de septiembre de 2026, con las reglas 4 a 8 implementadas.
-**194 tests de API** (build Release con 0 warnings) y **418 comprobaciones en
+**201 tests de API** (build Release con 0 warnings) y **418 comprobaciones en
 navegador real** (`npm run e2e` + `npm run e2e:proxy`), todo en verde.
 
 | Regla | Estado | Detalle |
@@ -541,6 +541,11 @@ cd StockHex.Web && npm run typecheck && npm run lint && npm run build && npm aud
 # El stack completo, y el recorrido en navegador real
 docker compose up -d --build
 cd StockHex.Web && APP_URL=http://localhost:8080 npm run e2e && npm run e2e:proxy
+
+# El stack CON datos de demostración: catálogo, clientes, usuarios con distintos
+# roles y tres meses de movimientos. Sólo en local, y sólo si se enciende a mano.
+echo "SEED_DEMO_DATA=true" >> .env
+docker compose down -v && docker compose up -d --build   # -v: se siembra en base limpia
 ```
 
 `npm run e2e` corre las 6 suites con [`e2e/run.mjs`](StockHex.Web/e2e/run.mjs), que
@@ -550,6 +555,20 @@ sin poder entrar, con un timeout que parecía un fallo del producto. Por eso la 
 completa tarda varios minutos; una suite suelta (`npm run e2e:filters`) es inmediata.
 
 `-warnaserror` no es opcional: la solución compila con **0 warnings** y debe seguir así.
+
+**Los datos de demostración son la forma de ver la aplicación trabajando.** Una base
+vacía no paginaría, no tendría stock bajo y la matriz de permisos no se aplicaría a
+nadie. `SEED_DEMO_DATA=true` siembra 46 productos, 14 clientes, cinco usuarios con
+roles distintos —todos con la contraseña `Demo1234`— y ~835 movimientos en 90 días,
+con reversiones incluidas. Se siembra **una sola vez** (hay marca de agua) y viene
+**apagado**: no se ata a `Development` porque el compose local corre como
+`Production`, así que la única protección es no encenderlo fuera de tu máquina.
+Detalle en el [README](README.md#datos-de-demostración-sólo-local).
+
+El sembrador escribe directo al contexto, sin pasar por `CreateMovement`, así que
+podría producir un historial que no cuadre con el saldo. No lo hace, y eso lo fija
+`UseCases/DemoDataSeederTests`: ningún producto nace con stock, cada línea arranca
+donde terminó la anterior y el saldo final coincide con el último movimiento.
 
 `dotnet test` incluye los tests de `Database/`, que levantan un **SQL Server real**
 con Testcontainers. Son los únicos que verifican lo que el proveedor InMemory no
@@ -581,7 +600,7 @@ contra `127.0.0.1`.
 | 2026-09-02 | Regla 8 · tamaño de página elegible (10/15/25), definido en el backend y reflejado en la URL | Pedida al cerrar la regla 4 |
 
 Reglas 4 a 8 implementadas el 2 de septiembre de 2026 (API y frontend), verificadas
-con **194 tests de API** y **418 comprobaciones en navegador real** repartidas en
+con **201 tests de API** y **418 comprobaciones en navegador real** repartidas en
 siete suites de Playwright.
 
 Cada regla nueva se agrega arriba con su fecha y se refleja en
