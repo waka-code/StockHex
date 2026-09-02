@@ -59,6 +59,9 @@ values.dev.yaml
 .DS_Store
 Thumbs.db
 
-## Node (por si se agrega frontend)
+## Node
 node_modules/
 npm-debug.log*
+
+## Notas de trabajo, no parte del repositorio
+MVP.md
