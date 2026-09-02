@@ -357,6 +357,18 @@ alguien pida el listado completo escribiendo la URL. No es una opción de la int
 
 ---
 
+## Regla 9 · Autoría de los commits
+
+**Los mensajes de commit no llevan pie de coautoría.** Nada de
+`Co-Authored-By: Claude ...` ni de firmas de herramientas: GitHub construye la lista
+de contribuidores del repositorio a partir de esos pies —de todas las ramas, no sólo
+de `main`—, así que un trailer añade una cuenta a la ficha pública del proyecto.
+
+El autor de un commit es la persona que lo empuja. Si hay que reconocer ayuda de una
+herramienta, va en el cuerpo del mensaje como prosa, no como trailer.
+
+---
+
 ## Estado de cumplimiento
 
 Verificado sobre el código actual. **No todo cumple**: lo que falta está declarado
@@ -598,6 +610,7 @@ contra `127.0.0.1`.
 | 2026-09-02 | Reglas 0 a 6 (tipado, no duplicar, backend, query params, RBAC, contraseñas, proceso) | Acordadas con el equipo |
 | 2026-09-02 | Regla 7 · una sola fuente de permisos, en el código | Acordada al revisar el diseño del RBAC |
 | 2026-09-02 | Regla 8 · tamaño de página elegible (10/15/25), definido en el backend y reflejado en la URL | Pedida al cerrar la regla 4 |
+| 2026-09-02 | Regla 9 · los mensajes de commit no llevan pie de coautoría | Pedida al retirar a Claude de la lista de contribuidores |
 
 Reglas 4 a 8 implementadas el 2 de septiembre de 2026 (API y frontend), verificadas
 con **201 tests de API** y **418 comprobaciones en navegador real** repartidas en
