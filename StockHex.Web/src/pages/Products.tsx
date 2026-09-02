@@ -16,7 +16,7 @@ import { Button, Card, Chip, EmptyState, IconButton, Note } from '../components/
 import { clp } from '../lib/format';
 import { usePageMeta } from '../lib/hooks';
 import {
-  boolParam, enumParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
+  boolParam, enumParam, guidParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
 } from '../lib/urlFilters';
 
 const FORM_ID = 'product-form';
@@ -202,8 +202,8 @@ export function Products() {
     page: numberParam(1, { min: 1, pagination: true }),
     pageSize: pageSizeParam(),
     search: stringParam(),
-    categoryId: stringParam(),
-    supplierId: stringParam(),
+    categoryId: guidParam(),
+    supplierId: guidParam(),
     status: enumParam(['active', 'inactive', 'all'] as const, 'active'),
     lowStockOnly: boolParam(),
   });

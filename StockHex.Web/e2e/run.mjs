@@ -9,7 +9,7 @@
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-const SUITES = ['smoke', 'roles', 'refresh', 'rbac', 'filters'];
+const SUITES = ['smoke', 'roles', 'refresh', 'rbac', 'filters', 'stress'];
 const WINDOW_MS = 62_000;
 
 // Un solo destino para las cinco. Antes cada archivo traía su propio defecto y

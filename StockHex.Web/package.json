@@ -11,6 +11,7 @@
     "lint": "oxlint src",
     "e2e": "node e2e/run.mjs",
     "e2e:smoke": "node e2e/smoke.mjs",
+    "e2e:stress": "node e2e/stress.mjs",
     "e2e:roles": "node e2e/roles.mjs",
     "e2e:refresh": "node e2e/refresh.mjs",
     "e2e:proxy": "node e2e/proxy.mjs",

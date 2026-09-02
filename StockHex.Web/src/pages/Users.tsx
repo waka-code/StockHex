@@ -13,7 +13,7 @@ import { Button, Card, Chip, EmptyState, IconButton, Note } from '../components/
 import { dateTime, initials, relative } from '../lib/format';
 import { usePageMeta } from '../lib/hooks';
 import {
-  boolParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
+  boolParam, guidParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
 } from '../lib/urlFilters';
 
 const FORM_ID = 'user-form';
@@ -309,7 +309,7 @@ export function Users() {
     page: numberParam(1, { min: 1, pagination: true }),
     pageSize: pageSizeParam(),
     search: stringParam(),
-    roleId: stringParam(),
+    roleId: guidParam(),
     onlyInactive: boolParam(),
   });
   const { page, pageSize, search, roleId, onlyInactive } = filters.values;

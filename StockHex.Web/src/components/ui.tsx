@@ -169,16 +169,25 @@ export function Kpi({
   return (
     <section
       style={{
-        flex: 1, minWidth: 0, background: 'var(--surf)',
+        // `flex: 1` a secas es `1 1 0%`: con base cero las tarjetas nunca
+        // envuelven y se reparten el ancho que haya, por poco que sea. A 390px
+        // quedaban en 77px, y una etiqueta de una sola palabra —«REVERSIONES»,
+        // 81px— no cabe ni puede partirse, así que empujaba el icono fuera del
+        // documento y la página entera desplazaba en horizontal. Con una base
+        // real la fila pasa de cuatro columnas a dos y a una.
+        flex: '1 1 170px', minWidth: 0, background: 'var(--surf)',
         border: '1px solid var(--bord)', borderRadius: 'var(--r-lg)',
         padding: '14px 16px', boxShadow: 'var(--shadow)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <div
           style={{
             fontSize: 11, fontWeight: 500, color: 'var(--ink2)',
             textTransform: 'uppercase', letterSpacing: '.06em',
+            // Si aun así no cupiera, que se parta la palabra antes que
+            // desbordar: el desborde lo paga el documento entero.
+            minWidth: 0, overflowWrap: 'anywhere',
           }}
         >
           {label}

@@ -363,7 +363,7 @@ Verificado sobre el código actual. **No todo cumple**: lo que falta está decla
 como trabajo pendiente, no escondido.
 
 Última verificación: 2 de septiembre de 2026, con las reglas 4 a 8 implementadas.
-**194 tests de API** (build Release con 0 warnings) y **95 comprobaciones en
+**194 tests de API** (build Release con 0 warnings) y **418 comprobaciones en
 navegador real** (`npm run e2e` + `npm run e2e:proxy`), todo en verde.
 
 | Regla | Estado | Detalle |
@@ -543,7 +543,7 @@ docker compose up -d --build
 cd StockHex.Web && APP_URL=http://localhost:8080 npm run e2e && npm run e2e:proxy
 ```
 
-`npm run e2e` corre las 5 suites con [`e2e/run.mjs`](StockHex.Web/e2e/run.mjs), que
+`npm run e2e` corre las 6 suites con [`e2e/run.mjs`](StockHex.Web/e2e/run.mjs), que
 **espera entre una y otra**: el limitador de `/api/auth` acepta 10 intentos por minuto
 y una tanda completa hace más de 10 logins. Encadenarlas con `&&` dejaba a las últimas
 sin poder entrar, con un timeout que parecía un fallo del producto. Por eso la tanda
@@ -581,8 +581,8 @@ contra `127.0.0.1`.
 | 2026-09-02 | Regla 8 · tamaño de página elegible (10/15/25), definido en el backend y reflejado en la URL | Pedida al cerrar la regla 4 |
 
 Reglas 4 a 8 implementadas el 2 de septiembre de 2026 (API y frontend), verificadas
-con **194 tests de API** y **95 comprobaciones en navegador real** repartidas en seis
-suites de Playwright.
+con **194 tests de API** y **418 comprobaciones en navegador real** repartidas en
+siete suites de Playwright.
 
 Cada regla nueva se agrega arriba con su fecha y se refleja en
 [Estado de cumplimiento](#estado-de-cumplimiento).

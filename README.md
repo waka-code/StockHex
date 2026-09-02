@@ -7,7 +7,7 @@ autenticación JWT y autorización por roles.
 - **Interfaz web** en React + Vite + TypeScript → [`StockHex.Web/`](StockHex.Web/README.md)
 
 ```
-[██████████] MVP funcional  ·  194/194 tests de API  ·  95 comprobaciones en navegador real
+[██████████] MVP funcional  ·  194/194 tests de API  ·  418 comprobaciones en navegador real
 ```
 
 > **Antes de implementar cualquier cosa, lee [`CLAUDE.md`](CLAUDE.md)**: son las
@@ -110,7 +110,7 @@ cd "StockHex API" && dotnet test     # 194 tests de la API
 
 cd StockHex.Web
 npx playwright install chromium      # una vez
-npm run e2e                          # las 5 suites en navegador real
+npm run e2e                          # las 6 suites en navegador real
 npm run e2e:proxy                    # el despliegue: un origen, sin CORS, límites
 ```
 
@@ -118,6 +118,13 @@ npm run e2e:proxy                    # el despliegue: un origen, sin CORS, lími
 intentos por minuto y una tanda completa hace más de 10 logins, así que encadenarlas
 sin pausa dejaba a las últimas sin poder entrar. Por eso la tanda tarda varios
 minutos; una suite suelta (`npm run e2e:filters`) es inmediata.
+
+La sexta suite, **`e2e:stress`**, recorre las diez pantallas una a una y las maltrata:
+teclea letra a letra, hace doble clic por impaciencia, cierra con Escape, navega con
+el botón atrás, refresca a media faena, manipula la URL, abre seis pestañas a la vez y
+prueba seis tamaños de ventana entre 1920px y 390px. Cada pantalla se audita sola —sin
+errores de consola, sin excepciones, sin 5xx, sin desbordes horizontales del documento
+y sin filas apiladas— y lo que crea lo borra al terminar.
 
 ---
 

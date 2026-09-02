@@ -121,6 +121,27 @@ export function dateParam(fallback = ''): ParamDef<string> {
   };
 }
 
+/**
+ * Identificador de una entidad: un GUID, el formato que devuelve la API.
+ *
+ * Existe porque `stringParam()` deja pasar cualquier cosa, y un `?categoryId=`
+ * corrupto —un enlace mal copiado, una URL editada a mano— viajaba tal cual a la
+ * API, que responde `400` y deja la pantalla con un aviso de error en vez del
+ * listado. La regla 4 pide parseo tolerante: lo que no tiene forma de id se
+ * descarta y el filtro vuelve a «todos».
+ */
+export function guidParam(fallback = ''): ParamDef<string> {
+  const isValid = (raw: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw);
+
+  return {
+    parse: (raw) => (raw !== null && isValid(raw) ? raw : fallback),
+    serialize: (value) => (value === fallback || !isValid(value) ? null : value),
+    isDefault: (value) => value === fallback,
+    isPagination: false,
+  };
+}
+
 // ───────────────────────────────────────────────────────────── el hook
 
 /**

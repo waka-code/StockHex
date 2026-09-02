@@ -16,7 +16,7 @@ import { MOVEMENT } from '../components/tokens';
 import { clp, dateTime, dateTimeShort, num } from '../lib/format';
 import { usePageMeta } from '../lib/hooks';
 import {
-  boolParam, dateParam, enumParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
+  boolParam, dateParam, enumParam, guidParam, numberParam, pageSizeParam, stringParam, useDebouncedParam, useUrlFilters,
 } from '../lib/urlFilters';
 import { NewMovementButton } from './MovementForm';
 
@@ -116,10 +116,10 @@ export function Movements() {
     page: numberParam(1, { min: 1, pagination: true }),
     pageSize: pageSizeParam(),
     search: stringParam(),
-    productId: stringParam(),
+    productId: guidParam(),
     type: enumParam(['', 'In', 'Out', 'Adjustment'] as const, ''),
     partyKind: enumParam(['', 'supplier', 'client'] as const, ''),
-    partyId: stringParam(),
+    partyId: guidParam(),
     from: dateParam(),
     to: dateParam(),
     onlyMine: boolParam(),
