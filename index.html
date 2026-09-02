@@ -37,6 +37,11 @@
   --shadow:     0 1px 2px rgba(11,17,20,.05), 0 12px 32px rgba(11,17,20,.06);
   --shadow-lg:  0 24px 70px rgba(9,14,17,.16);
 
+  /* La página deja de crecer aquí. En una pantalla de 6000px el texto no debe
+     estirarse hasta los bordes: se queda en su columna y el papel la rodea. */
+  --shell: 1140px;
+  --gutter: 24px;
+
   --display: 'IBM Plex Sans Condensed', 'IBM Plex Sans', system-ui, sans-serif;
   --sans:    'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono:    'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -114,9 +119,13 @@ a { color: inherit; }
 }
 
 .wrap {
-  width: min(1120px, 100% - 48px);
+  width: min(var(--shell), 100% - var(--gutter) * 2);
   margin-inline: auto;
 }
+
+/* Las reglas de sección y cualquier bloque a sangre se alinean con la columna:
+   una línea de 6000px sobre un texto de 1140 subraya el vacío, no la estructura. */
+.rule-wrap { width: min(var(--shell), 100% - var(--gutter) * 2); margin-inline: auto; }
 
 /* Etiqueta de columna de libro mayor: mono, versal, con aire entre letras. */
 .eyebrow {
@@ -385,13 +394,15 @@ section { padding-block: clamp(56px, 8vw, 104px); }
 /* ─────────────────────────────────────────────── problema */
 .problem-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));   /* 4 celdas: una fila */
   gap: 1px;
   background: var(--rule);
   border: 1px solid var(--rule);
   border-radius: 10px;
   overflow: hidden;
 }
+@media (max-width: 980px) { .problem-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .problem-grid { grid-template-columns: minmax(0, 1fr); } }
 .problem-cell {
   background: var(--surf);
   padding: 22px 22px 24px;
@@ -410,9 +421,11 @@ section { padding-block: clamp(56px, 8vw, 104px); }
 /* ─────────────────────────────────────────────── tipos */
 .types {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));   /* 3 tipos: una fila */
   gap: 18px;
 }
+/* En dos columnas el tercero quedaría solo: se pasa directo a una. */
+@media (max-width: 860px) { .types { grid-template-columns: minmax(0, 1fr); } }
 .type-card {
   background: var(--surf);
   border: 1px solid var(--rule);
@@ -495,13 +508,17 @@ section { padding-block: clamp(56px, 8vw, 104px); }
 /* ─────────────────────────────────────────────── capacidades */
 .caps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));   /* 6 tarjetas: dos filas */
   gap: 1px;
   background: var(--rule);
-  border-block: 1px solid var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  overflow: hidden;
 }
+@media (max-width: 900px) { .caps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .caps { grid-template-columns: minmax(0, 1fr); } }
 .cap {
-  background: var(--paper);
+  background: var(--surf);
   padding: 24px 24px 26px;
   display: flex;
   flex-direction: column;
@@ -520,9 +537,10 @@ section { padding-block: clamp(56px, 8vw, 104px); }
 /* ─────────────────────────────────────────────── cifras */
 .figures {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 26px 34px;
 }
+@media (max-width: 760px) { .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .fig .n {
   font-family: var(--display);
   font-weight: 700;
@@ -536,12 +554,13 @@ section { padding-block: clamp(56px, 8vw, 104px); }
 
 .stack-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0 34px;
   margin-top: 44px;
   padding-top: 30px;
   border-top: 1px solid var(--rule);
 }
+@media (max-width: 780px) { .stack-list { grid-template-columns: minmax(0, 1fr); } }
 .stack-list dl { margin: 0; display: grid; }
 .stack-list div {
   display: flex;
@@ -715,7 +734,7 @@ footer {
     </div>
   </section>
 
-  <hr class="rule">
+  <div class="rule-wrap"><hr class="rule"></div>
 
   <!-- ───────────────────────────────── el problema -->
   <section id="idea">
@@ -765,7 +784,7 @@ footer {
     </div>
   </section>
 
-  <hr class="rule">
+  <div class="rule-wrap"><hr class="rule"></div>
 
   <!-- ───────────────────────────────── cómo funciona -->
   <section>
@@ -818,7 +837,7 @@ footer {
     </div>
   </section>
 
-  <hr class="rule">
+  <div class="rule-wrap"><hr class="rule"></div>
 
   <!-- ───────────────────────────────── capturas -->
   <section id="pantallas">
@@ -896,7 +915,7 @@ footer {
     </div>
   </section>
 
-  <hr class="rule">
+  <div class="rule-wrap"><hr class="rule"></div>
 
   <!-- ───────────────────────────────── qué ofrece -->
   <section id="ofrece">
@@ -911,9 +930,8 @@ footer {
           </p>
         </div>
       </div>
-    </div>
 
-    <div class="caps">
+      <div class="caps">
       <div class="cap">
         <p class="tag">Auditoría</p>
         <h3>Historial inmutable</h3>
@@ -962,10 +980,11 @@ footer {
           proxy de la API: un único origen y nada de CORS que configurar.
         </p>
       </div>
+      </div>
     </div>
   </section>
 
-  <hr class="rule">
+  <div class="rule-wrap"><hr class="rule"></div>
 
   <!-- ───────────────────────────────── cifras y stack -->
   <section>
@@ -1024,7 +1043,7 @@ footer {
     </div>
   </section>
 
-  <hr class="rule">
+  <div class="rule-wrap"><hr class="rule"></div>
 
   <!-- ───────────────────────────────── arranque -->
   <section>
@@ -1062,7 +1081,7 @@ footer {
     </div>
   </section>
 
-  <hr class="rule">
+  <div class="rule-wrap"><hr class="rule"></div>
 
   <!-- ───────────────────────────────── cierre -->
   <section>
