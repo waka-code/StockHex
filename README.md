@@ -763,10 +763,6 @@ cumple, para que nadie repita una deuda que ya está anotada.
 
 ---
 
-## Licencia
-
-Sin licencia definida. Añade un `LICENSE` antes de publicar.
-
 ## Desarrollador
 
-**Waddini** — Arquitectura & Development
+**Waddimi** — Arquitectura & Development
